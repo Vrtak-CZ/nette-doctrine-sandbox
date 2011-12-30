@@ -2,3 +2,7 @@
 !.*
 !*/.*
 !web.config
+!sessions
+sessions/*
+!cache
+cache/*

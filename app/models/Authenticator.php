@@ -11,14 +11,14 @@ use Nette\Security as NS;
  */
 class Authenticator extends Nette\Object implements NS\IAuthenticator
 {
-	/** @var Nette\Database\Table\Selection */
-	private $users;
+	/** @var \Doctrine\ORM\EntityRepository */
+	private $repository;
 
 
 
-	public function __construct(Nette\Database\Table\Selection $users)
+	public function __construct(\Doctrine\ORM\EntityRepository $repository)
 	{
-		$this->users = $users;
+		$this->repository = $repository;
 	}
 
 
@@ -32,18 +32,17 @@ class Authenticator extends Nette\Object implements NS\IAuthenticator
 	public function authenticate(array $credentials)
 	{
 		list($username, $password) = $credentials;
-		$row = $this->users->where('username', $username)->fetch();
+		$user = $this->repository->findOneByUsername($username);
 
-		if (!$row) {
+		if (!$user) {
 			throw new NS\AuthenticationException("User '$username' not found.", self::IDENTITY_NOT_FOUND);
 		}
 
-		if ($row->password !== $this->calculateHash($password)) {
+		if ($user->password !== $this->calculateHash($password)) {
 			throw new NS\AuthenticationException("Invalid password.", self::INVALID_CREDENTIAL);
 		}
 
-		unset($row->password);
-		return new NS\Identity($row->id, $row->role, $row->toArray());
+		return new NS\Identity($user->id, array(), array('username' => $user->username));
 	}
 
 

@@ -7,11 +7,8 @@
 common:
 	parameters:
 		database:
-			driver: mysql
-			host: localhost
-			dbname: test
-			user:
-			password:
+			driver: pdo_sqlite
+			path: %appDir%/models/db.sqlite
 
 
 	php:
@@ -19,20 +16,9 @@ common:
 		# session.save_path: "%tempDir%/sessions"
 		# zlib.output_compression: yes
 
-
 	services:
-		database:
-			class: Nette\Database\Connection(
-				'%database.driver%:host=%database.host%;dbname=%database.dbname%'
-				%database.user%
-				%database.password%
-			)
-			setup:
-				- setCacheStorage(...)
-				#- setDatabaseReflection( Nette\Database\Reflection\DiscoveredReflection() )
-
-		authenticator: Authenticator( @database::table(users) )
-
+		authenticator:
+			class: Authenticator(@entityManager::getRepository('User'))
 
 	factories:
 
@@ -40,3 +26,6 @@ common:
 production < common:
 
 development < common:
+	services:
+		cacheStorage:
+			class: Nette\Caching\Storages\MemoryStorage
