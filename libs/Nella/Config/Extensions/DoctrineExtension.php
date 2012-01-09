@@ -33,14 +33,14 @@ class DoctrineExtension extends \Nette\Config\CompilerExtension
 	}
 
 	/**
-	 * Processes configuration data.
+	 * Processes configuration data
 	 *
-	 * @param  \Nette\DI\ContainerBuilder builded DI container
-	 * @param  array  configuration (with expanded parameters)
 	 * @return void
 	 */
-	public function loadConfiguration(ContainerBuilder $container, array $config)
+	public function loadConfiguration()
 	{
+		$container = $this->getContainerBuilder();
+
 		if (!$this->skipInitDefaultParameters) {
 			$this->initDefaultParameters($container);
 		}
@@ -53,7 +53,7 @@ class DoctrineExtension extends \Nette\Config\CompilerExtension
 		$container->addDefinition($this->prefix('metadataDriver'))
 			->setClass('Doctrine\ORM\Mapping\Driver\Driver')
 			->setFactory('Nella\Config\Extensions\DoctrineExtension::createMetadataDriver', array(
-				$this->prefix('@cache'), '%database.entityDirs%'
+				$this->prefix('@cache'), '%database.entityDirs%', '%database.useAnnotationNamespace%'
 			));
 
 		// logger
@@ -86,8 +86,7 @@ class DoctrineExtension extends \Nette\Config\CompilerExtension
 		// connection from factory
 		$container->addDefinition($this->prefix('connection'))
 			->setClass('Doctrine\DBAL\Connection')
-			//->setFactory($connectionFactory, array(
-			->setFactory('@container::create' . ucfirst($this->prefix('newConnection')), array(
+			->setFactory($connectionFactory, array(
 				'%database%', $this->prefix('@configuration'), $this->prefix('@eventManager')
 			));
 
@@ -101,8 +100,7 @@ class DoctrineExtension extends \Nette\Config\CompilerExtension
 		// entity manager from factory
 		$container->addDefinition($this->prefix('entityManager'))
 			->setClass('Doctrine\ORM\EntityManager')
-			//->setFactory($emFactory, array(
-			->setFactory('@container::create' . ucfirst($this->prefix('newEntityManager')), array(
+			->setFactory($emFactory, array(
 				$this->prefix('@connection'), $this->prefix('@configuration'), $this->prefix('@eventManager')
 			))
 			->setAutowired(FALSE);
@@ -157,6 +155,7 @@ class DoctrineExtension extends \Nette\Config\CompilerExtension
 				'proxyDir' => "%appDir%/proxies",
 				'proxyNamespace' => 'App\Model\Proxies',
 				'entityDirs' => array('%appDir%'),
+				'useAnnotationNamespace' => TRUE,
 			)
 		));
 	}
@@ -164,9 +163,10 @@ class DoctrineExtension extends \Nette\Config\CompilerExtension
 	/**
 	 * @param \Doctrine\Common\Cache\Cache
 	 * @param array
+	 * @param bool
 	 * @return \Doctrine\ORM\Mapping\Driver\Driver
 	 */
-	public static function createMetadataDriver(Cache $cache, array $entityDirs)
+	public static function createMetadataDriver(Cache $cache, array $entityDirs, $useAnnotationNamespace = TRUE)
 	{
 		\Doctrine\Common\Annotations\AnnotationRegistry::registerFile(
 			dirname(\Nette\Reflection\ClassType::from('Doctrine\ORM\Version')->getFileName()).
@@ -174,7 +174,12 @@ class DoctrineExtension extends \Nette\Config\CompilerExtension
 		);
 
 		$reader = new \Doctrine\Common\Annotations\AnnotationReader();
-		$reader->setAnnotationNamespaceAlias('Doctrine\ORM\Mapping\\', 'ORM');
+		if (!$useAnnotationNamespace) {
+			$reader->setDefaultAnnotationNamespace('Doctrine\ORM\Mapping\\');
+			//$reader->addNamespace('Doctrine\ORM\Mapping'); // Doctrine 2.2
+		} else // in Doctrine 2.2 removed - fuck! fuck! fuck!
+			$reader->setAnnotationNamespaceAlias('Doctrine\ORM\Mapping\\', 'ORM');
+
 		$reader->setIgnoreNotImportedAnnotations(true);
 		$reader->setEnableParsePhpImports(false);
 		$reader = new \Doctrine\Common\Annotations\CachedReader(

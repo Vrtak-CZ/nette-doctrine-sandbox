@@ -3,7 +3,7 @@
 /**
  * This file is part of the Nette Framework (http://nette.org)
  *
- * Copyright (c) 2004, 2011 David Grudl (http://davidgrudl.com)
+ * Copyright (c) 2004 David Grudl (http://davidgrudl.com)
  *
  * For the full copyright and license information, please view
  * the file license.txt that was distributed with this source code.
@@ -242,7 +242,7 @@ class Parser extends Nette\Object
 
 		} elseif (!empty($matches['end'])) { // end of HTML tag />
 			$node = end($this->htmlNodes);
-			$isEmpty = !$node->closing && (strpos($matches['end'], '/') !== FALSE || $node->isEmpty);
+			$isEmpty = !$node->closing && (Strings::contains($matches['end'], '/') || $node->isEmpty);
 
 			if ($isEmpty) {
 				$matches[0] = (Nette\Utils\Html::$xhtml ? ' />' : '>')

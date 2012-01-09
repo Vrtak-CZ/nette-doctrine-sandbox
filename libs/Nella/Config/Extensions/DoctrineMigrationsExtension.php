@@ -35,14 +35,14 @@ class DoctrineMigrationsExtension extends \Nette\Config\CompilerExtension
 	}
 
 	/**
-	 * Processes configuration data.
+	 * Processes configuration data
 	 *
-	 * @param  \Nette\DI\ContainerBuilder builded DI container
-	 * @param  array  configuration (with expanded parameters)
 	 * @return void
 	 */
-	public function loadConfiguration(ContainerBuilder $container, array $config)
+	public function loadConfiguration()
 	{
+		$container = $this->getContainerBuilder();
+
 		if (!$this->skipInitDefaultParameters) {
 			$this->initDefaultParameters($container);
 		}

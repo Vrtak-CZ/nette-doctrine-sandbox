@@ -3,7 +3,7 @@
 /**
  * This file is part of the Nette Framework (http://nette.org)
  *
- * Copyright (c) 2004, 2011 David Grudl (http://davidgrudl.com)
+ * Copyright (c) 2004 David Grudl (http://davidgrudl.com)
  *
  * For the full copyright and license information, please view
  * the file license.txt that was distributed with this source code.
@@ -43,7 +43,7 @@ class Compiler extends Nette\Object
 
 	/**
 	 * Add custom configurator extension.
-	 * @return ServiceDefinition
+	 * @return Compiler  provides a fluent interface
 	 */
 	public function addExtension($name, CompilerExtension $extension)
 	{
@@ -69,7 +69,7 @@ class Compiler extends Nette\Object
 	/**
 	 * @return Nette\DI\ContainerBuilder
 	 */
-	public function getContainer()
+	public function getContainerBuilder()
 	{
 		return $this->container;
 	}
@@ -118,10 +118,8 @@ class Compiler extends Nette\Object
 			throw new Nette\InvalidStateException("Found sections '$extra' in configuration, but corresponding extensions are missing.");
 		}
 
-		$configExp = $this->container->expand($this->config);
 		foreach ($this->extensions as $name => $extension) {
-			$config = isset($configExp[$name]) ? array_diff_key($configExp[$name], self::$reserved) : array();
-			$extension->loadConfiguration($this->container, $config);
+			$extension->loadConfiguration();
 		}
 	}
 
@@ -137,7 +135,7 @@ class Compiler extends Nette\Object
 
 			if (isset($this->config[$name])) {
 				$this->parseServices($this->container, $this->config[$name], $name);
-	}
+			}
 		}
 	}
 
@@ -146,7 +144,7 @@ class Compiler extends Nette\Object
 	public function generateCode($className, $parentName)
 	{
 		foreach ($this->extensions as $extension) {
-			$extension->beforeCompile($this->container);
+			$extension->beforeCompile();
 		}
 
 		$class = $this->container->generateClass($parentName);
@@ -154,7 +152,7 @@ class Compiler extends Nette\Object
 			->addMethod('initialize');
 
 		foreach ($this->extensions as $extension) {
-			$extension->afterCompile($this->container, $class);
+			$extension->afterCompile($class);
 		}
 		return (string) $class;
 	}
