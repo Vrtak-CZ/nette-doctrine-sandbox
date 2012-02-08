@@ -96,7 +96,7 @@ class Session extends Nette\Object
 
 		Nette\Diagnostics\Debugger::tryError();
 		session_start();
-		if (Nette\Diagnostics\Debugger::catchError($e)) {
+		if (Nette\Diagnostics\Debugger::catchError($e) && !session_id()) {
 			@session_write_close(); // this is needed
 			throw new Nette\InvalidStateException('session_start(): ' . $e->getMessage(), 0, $e);
 		}
@@ -146,8 +146,8 @@ class Session extends Nette\Object
 				if (is_array($metadata)) {
 					foreach ($metadata as $variable => $value) {
 						if ((!empty($value['B']) && $browserClosed) || (!empty($value['T']) && $now > $value['T']) // whenBrowserIsClosed || Time
-							|| ($variable !== '' && is_object($nf['DATA'][$section][$variable]) && (isset($value['V']) ? $value['V'] : NULL) // Version
-								!== Nette\Reflection\ClassType::from($nf['DATA'][$section][$variable])->getAnnotation('serializationVersion'))
+							|| (isset($nf['DATA'][$section][$variable]) && is_object($nf['DATA'][$section][$variable]) && (isset($value['V']) ? $value['V'] : NULL) // Version
+								!= Nette\Reflection\ClassType::from($nf['DATA'][$section][$variable])->getAnnotation('serializationVersion')) // intentionally !=
 						) {
 							if ($variable === '') { // expire whole section
 								unset($nf['META'][$section], $nf['DATA'][$section]);
@@ -223,7 +223,7 @@ class Session extends Nette\Object
 	 */
 	public function exists()
 	{
-		return self::$started || $this->request->getCookie(session_name()) !== NULL;
+		return self::$started || $this->request->getCookie($this->getName()) !== NULL;
 	}
 
 
@@ -284,7 +284,7 @@ class Session extends Nette\Object
 	 */
 	public function getName()
 	{
-		return session_name();
+		return isset($this->options['name']) ? $this->options['name'] : session_name();
 	}
 
 
@@ -435,6 +435,7 @@ class Session extends Nette\Object
 			if (!strncmp($key, 'session.', 8)) { // back compatibility
 				$key = substr($key, 8);
 			}
+			$key = strtolower(preg_replace('#(.)(?=[A-Z])#', '$1_', $key));
 
 			if ($value === NULL || ini_get("session.$key") == $value) { // intentionally ==
 				continue;

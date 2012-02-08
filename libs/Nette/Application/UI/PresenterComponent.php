@@ -25,6 +25,7 @@ use Nette;
  * @author     David Grudl
  *
  * @property-read Presenter $presenter
+ * @property-read string $uniqueId
  */
 abstract class PresenterComponent extends Nette\ComponentModel\Container implements ISignalReceiver, IStatePersistent, \ArrayAccess
 {
@@ -95,7 +96,7 @@ abstract class PresenterComponent extends Nette\ComponentModel\Container impleme
 			$rm = $rc->getMethod($method);
 			if ($rm->isPublic() && !$rm->isAbstract() && !$rm->isStatic()) {
 				$this->checkRequirements($rm);
-				$rm->invokeNamedArgs($this, $params);
+				$rm->invokeArgs($this, $rc->combineArgs($rm, $params));
 				return TRUE;
 			}
 		}
@@ -145,8 +146,10 @@ abstract class PresenterComponent extends Nette\ComponentModel\Container impleme
 						settype($params[$nm], gettype($meta['def']));
 					}
 				}
+				$this->$nm = & $params[$nm];
+			} else {
+				$params[$nm] = & $this->$nm;
 			}
-			$this->$nm = & $params[$nm];
 		}
 		$this->params = $params;
 	}

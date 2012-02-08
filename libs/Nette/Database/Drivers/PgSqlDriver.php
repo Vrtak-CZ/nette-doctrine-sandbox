@@ -22,9 +22,6 @@ use Nette;
  */
 class PgSqlDriver extends Nette\Object implements Nette\Database\ISupplementalDriver
 {
-	/** @var array */
-	public $supports = array('meta' => TRUE);
-
 	/** @var Nette\Database\Connection */
 	private $connection;
 
@@ -142,6 +139,7 @@ class PgSqlDriver extends Nette\Object implements Nette\Database\ISupplementalDr
 				'nullable' => $row['is_nullable'] === 'YES',
 				'default' => $row['column_default'],
 				'autoincrement' => (int) $row['ordinal_position'] === $primary && substr($row['column_default'], 0, 7) === 'nextval',
+				'primary' => (int) $row['ordinal_position'] === $primary,
 				'vendor' => (array) $row,
 			);
 		}
@@ -191,6 +189,16 @@ class PgSqlDriver extends Nette\Object implements Nette\Database\ISupplementalDr
 	public function getForeignKeys($table)
 	{
 		throw new NotImplementedException;
+	}
+
+
+
+	/**
+	 * @return bool
+	 */
+	public function isSupported($item)
+	{
+		return $item === self::META;
 	}
 
 }

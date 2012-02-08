@@ -22,8 +22,7 @@ use Nette,
  * @author     David Grudl
  *
  * @property   bool $productionMode
- * @property   string $tempDirectory
- * @property-read \SystemContainer $container
+ * @property-write $tempDirectory
  */
 class Configurator extends Nette\Object
 {
@@ -37,28 +36,28 @@ class Configurator extends Nette\Object
 	public $onCompile;
 
 	/** @var array */
-	private $params;
+	protected $parameters;
 
 	/** @var array */
-	private $files = array();
+	protected $files = array();
 
 
 
 	public function __construct()
 	{
-		$this->params = $this->getDefaultParameters();
+		$this->parameters = $this->getDefaultParameters();
 	}
 
 
 
 	/**
 	 * Set parameter %productionMode%.
-	 * @param  bool
+	 * @param  bool|string|array
 	 * @return Configurator  provides a fluent interface
 	 */
-	public function setProductionMode($on = TRUE)
+	public function setProductionMode($value = TRUE)
 	{
-		$this->params['productionMode'] = (bool) $on;
+		$this->parameters['productionMode'] = is_bool($value) ? $value : self::detectProductionMode($value);
 		return $this;
 	}
 
@@ -69,7 +68,7 @@ class Configurator extends Nette\Object
 	 */
 	public function isProductionMode()
 	{
-		return $this->params['productionMode'];
+		return $this->parameters['productionMode'];
 	}
 
 
@@ -80,9 +79,8 @@ class Configurator extends Nette\Object
 	 */
 	public function setTempDirectory($path)
 	{
-		$this->params['tempDir'] = $path;
-		if (!is_dir($cacheDir = $this->getCacheDirectory())) {
-			umask(0000);
+		$this->parameters['tempDir'] = $path;
+		if (($cacheDir = $this->getCacheDirectory()) && !is_dir($cacheDir)) {
 			mkdir($cacheDir, 0777);
 		}
 		return $this;
@@ -96,7 +94,7 @@ class Configurator extends Nette\Object
 	 */
 	public function addParameters(array $params)
 	{
-		$this->params = Helpers::merge($params, $this->params);
+		$this->parameters = Helpers::merge($params, $this->parameters);
 		return $this;
 	}
 
@@ -112,12 +110,26 @@ class Configurator extends Nette\Object
 			'appDir' => isset($trace[1]['file']) ? dirname($trace[1]['file']) : NULL,
 			'wwwDir' => isset($_SERVER['SCRIPT_FILENAME']) ? dirname($_SERVER['SCRIPT_FILENAME']) : NULL,
 			'productionMode' => static::detectProductionMode(),
+			'environment' => static::detectProductionMode() ? self::PRODUCTION : self::DEVELOPMENT,
 			'consoleMode' => PHP_SAPI === 'cli',
 			'container' => array(
 				'class' => 'SystemContainer',
 				'parent' => 'Nette\DI\Container',
 			)
 		);
+	}
+
+
+
+	/**
+	 * @param  string        error log directory
+	 * @param  string        administrator email
+	 * @return Configurator  provides a fluent interface
+	 */
+	public function enableDebugger($logDirectory = NULL, $email = NULL)
+	{
+		Nette\Diagnostics\Debugger::$strictMode = TRUE;
+		Nette\Diagnostics\Debugger::enable($this->parameters['productionMode'], $logDirectory, $email);
 	}
 
 
@@ -132,7 +144,7 @@ class Configurator extends Nette\Object
 		}
 		$loader = new Nette\Loaders\RobotLoader;
 		$loader->setCacheStorage(new Nette\Caching\Storages\FileStorage($cacheDir));
-		$loader->autoRebuild = !$this->params['productionMode'];
+		$loader->autoRebuild = !$this->parameters['productionMode'];
 		return $loader;
 	}
 
@@ -144,10 +156,7 @@ class Configurator extends Nette\Object
 	 */
 	public function addConfig($file, $section = self::AUTO)
 	{
-		if ($section === self::AUTO) {
-			$section = $this->params['productionMode'] ? self::PRODUCTION : self::DEVELOPMENT;
-		}
-		$this->files[] = array($file, $section);
+		$this->files[] = array($file, $section === self::AUTO ? $this->parameters['environment'] : $section);
 		return $this;
 	}
 
@@ -170,12 +179,12 @@ class Configurator extends Nette\Object
 	{
 		if ($cacheDir = $this->getCacheDirectory()) {
 			$cache = new Cache(new Nette\Caching\Storages\PhpFileStorage($cacheDir), 'Nette.Configurator');
-			$cacheKey = array($this->params, $this->files);
+			$cacheKey = array($this->parameters, $this->files);
 			$cached = $cache->load($cacheKey);
 			if (!$cached) {
 				$code = $this->buildContainer($dependencies);
 				$cache->save($cacheKey, $code, array(
-					Cache::FILES => $this->params['productionMode'] ? NULL : $dependencies,
+					Cache::FILES => $this->parameters['productionMode'] ? NULL : $dependencies,
 				));
 				$cached = $cache->load($cacheKey);
 			}
@@ -188,7 +197,7 @@ class Configurator extends Nette\Object
 			Nette\Utils\LimitedScope::evaluate($this->buildContainer()); // back compatibility with Environment
 		}
 
-		$container = new $this->params['container']['class'];
+		$container = new $this->parameters['container']['class'];
 		$container->initialize();
 		Nette\Environment::setContext($container); // back compatibility
 		return $container;
@@ -200,9 +209,9 @@ class Configurator extends Nette\Object
 	 * Build system container class.
 	 * @return string
 	 */
-	protected function buildContainer(& $dependencies)
+	protected function buildContainer(& $dependencies = NULL)
 	{
-		$loader = new Loader;
+		$loader = $this->createLoader();
 		$config = array();
 		$code = "<?php\n";
 		foreach ($this->files as $tmp) {
@@ -217,14 +226,14 @@ class Configurator extends Nette\Object
 		if (!isset($config['parameters'])) {
 			$config['parameters'] = array();
 		}
-		$config['parameters'] = Helpers::merge($config['parameters'], $this->params);
+		$config['parameters'] = Helpers::merge($config['parameters'], $this->parameters);
 
 		$compiler = $this->createCompiler();
 		$this->onCompile($this, $compiler);
 
 		$code .= $compiler->compile(
 			$config,
-			$this->params['container']['class'],
+			$this->parameters['container']['class'],
 			$config['parameters']['container']['parent']
 		);
 		$dependencies = array_merge($loader->getDependencies(), $compiler->getContainerBuilder()->getDependencies());
@@ -267,9 +276,19 @@ class Configurator extends Nette\Object
 
 
 
+	/**
+	 * @return Loader
+	 */
+	protected function createLoader()
+	{
+		return new Loader;
+	}
+
+
+
 	protected function getCacheDirectory()
 	{
-		return isset($this->params['tempDir']) ? $this->params['tempDir'] . '/cache' : NULL;
+		return empty($this->parameters['tempDir']) ? NULL : $this->parameters['tempDir'] . '/cache';
 	}
 
 
@@ -280,11 +299,15 @@ class Configurator extends Nette\Object
 
 	/**
 	 * Detects production mode by IP address.
+	 * @param  string|array  IP addresses or computer names whitelist detection
 	 * @return bool
 	 */
-	public static function detectProductionMode()
+	public static function detectProductionMode($list = NULL)
 	{
-		return !isset($_SERVER['REMOTE_ADDR']) || !in_array($_SERVER['REMOTE_ADDR'], array('127.0.0.1', '::1'), TRUE);
+		$list = is_string($list) ? preg_split('#[,\s]+#', $list) : $list;
+		$list[] = '127.0.0.1';
+		$list[] = '::1';
+		return !in_array(isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : php_uname('n'), $list, TRUE);
 	}
 
 }

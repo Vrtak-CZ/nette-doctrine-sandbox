@@ -43,6 +43,17 @@ class MicroPresenter extends Nette\Object implements Application\IPresenter
 
 
 	/**
+	 * Gets the context.
+	 * @return \SystemContainer|Nette\DI\IContainer
+	 */
+	final public function getContext()
+	{
+		return $this->context;
+	}
+
+
+
+	/**
 	 * @param  Nette\Application\Request
 	 * @return Nette\Application\IResponse
 	 */
@@ -64,7 +75,8 @@ class MicroPresenter extends Nette\Object implements Application\IPresenter
 			return;
 		}
 		$params['presenter'] = $this;
-		$response = callback($params['callback'])->invokeNamedArgs($params);
+		$method = callback($params['callback'])->toReflection();
+		$response = $method->invokeArgs(Application\UI\PresenterComponentReflection::combineArgs($method, $params));
 
 		if (is_string($response)) {
 			$response = array($response, array());
@@ -104,8 +116,8 @@ class MicroPresenter extends Nette\Object implements Application\IPresenter
 		$template->baseUrl = rtrim($url->getBaseUrl(), '/');
 		$template->basePath = rtrim($url->getBasePath(), '/');
 
-		$template->registerHelperLoader('Nette\Templating\DefaultHelpers::loader');
-		$template->setCacheStorage($context->templateCacheStorage);
+		$template->registerHelperLoader('Nette\Templating\Helpers::loader');
+		$template->setCacheStorage($context->nette->templateCacheStorage);
 		$template->onPrepareFilters[] = function($template) use ($latteFactory, $context) {
 			$template->registerFilter($latteFactory ? $latteFactory() : new Nette\Latte\Engine);
 		};
@@ -129,12 +141,12 @@ class MicroPresenter extends Nette\Object implements Application\IPresenter
 
 	/**
 	 * Throws HTTP error.
-	 * @param  int HTTP error code
 	 * @param  string
+	 * @param  int HTTP error code
 	 * @return void
 	 * @throws Nette\Application\BadRequestException
 	 */
-	public function error($code, $message = NULL)
+	public function error($message = NULL, $code = Http\IResponse::S404_NOT_FOUND)
 	{
 		throw new Application\BadRequestException($message, $code);
 	}

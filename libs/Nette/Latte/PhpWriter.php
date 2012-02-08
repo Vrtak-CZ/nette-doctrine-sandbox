@@ -28,23 +28,23 @@ class PhpWriter extends Nette\Object
 	/** @var string */
 	private $modifiers;
 
-	/** @var array */
-	private $context;
+	/** @var Compiler */
+	private $compiler;
 
 
 
-	public static function using(MacroNode $node, $context = NULL)
+	public static function using(MacroNode $node, $compiler = NULL)
 	{
-		return new static($node->tokenizer, $node->modifiers, $context);
+		return new static($node->tokenizer, $node->modifiers, $compiler);
 	}
 
 
 
-	public function __construct(MacroTokenizer $argsTokenizer, $modifiers = NULL, $context = NULL)
+	public function __construct(MacroTokenizer $argsTokenizer, $modifiers = NULL, Compiler $compiler = NULL)
 	{
 		$this->argsTokenizer = $argsTokenizer;
 		$this->modifiers = $modifiers;
-		$this->context = $context;
+		$this->compiler = $compiler;
 	}
 
 
@@ -115,7 +115,7 @@ class PhpWriter extends Nette\Object
 
 			} elseif (!$inside) {
 				if ($token['type'] === MacroTokenizer::T_SYMBOL) {
-					if ($this->context && $token['value'] === 'escape') {
+					if ($this->compiler && $token['value'] === 'escape') {
 						$var = $this->escape($var);
 						$tokenizer->fetch('|');
 					} else {
@@ -123,7 +123,7 @@ class PhpWriter extends Nette\Object
 						$inside = TRUE;
 					}
 				} else {
-					throw new ParseException("Modifier name must be alphanumeric string, '$token[value]' given.");
+					throw new CompileException("Modifier name must be alphanumeric string, '$token[value]' given.");
 				}
 			} else {
 				if ($token['value'] === ':' || $token['value'] === ',') {
@@ -280,36 +280,37 @@ class PhpWriter extends Nette\Object
 
 	public function escape($s)
 	{
-		switch ($this->context[0]) {
-		case Parser::CONTEXT_TEXT:
-			return "Nette\\Templating\\DefaultHelpers::escapeHtml($s, ENT_NOQUOTES)";
-		case Parser::CONTEXT_TAG:
-			return "Nette\\Templating\\DefaultHelpers::escapeHtml($s)";
-		case Parser::CONTEXT_ATTRIBUTE:
-			list(, $name, $quote) = $this->context;
-			$quote = $quote === '"' ? '' : ', ENT_QUOTES';
-			if (strncasecmp($name, 'on', 2) === 0) {
-				return "htmlSpecialChars(Nette\\Templating\\DefaultHelpers::escapeJs($s)$quote)";
-			} elseif ($name === 'style') {
-				return "htmlSpecialChars(Nette\\Templating\\DefaultHelpers::escapeCss($s)$quote)";
-			} else {
+		switch ($this->compiler->getContentType()) {
+		case Compiler::CONTENT_XHTML:
+		case Compiler::CONTENT_HTML:
+			$context = $this->compiler->getContext();
+			switch ($context[0]) {
+			case Compiler::CONTEXT_SINGLE_QUOTED:
+			case Compiler::CONTEXT_DOUBLE_QUOTED:
+				if ($context[1] === Compiler::CONTENT_JS) {
+					$s = "Nette\\Templating\\Helpers::escapeJs($s)";
+				} elseif ($context[1] === Compiler::CONTENT_CSS) {
+					$s = "Nette\\Templating\\Helpers::escapeCss($s)";
+				}
+				$quote = $context[0] === Compiler::CONTEXT_DOUBLE_QUOTED ? '' : ', ENT_QUOTES';
 				return "htmlSpecialChars($s$quote)";
-			}
-		case Parser::CONTEXT_COMMENT:
-			return "Nette\\Templating\\DefaultHelpers::escapeHtmlComment($s)";
-		case Parser::CONTEXT_CDATA;
-			return 'Nette\Templating\DefaultHelpers::escape' . ucfirst($this->context[1]) . "($s)"; // Js, Css
-		case Parser::CONTEXT_NONE:
-			switch (isset($this->context[1]) ? $this->context[1] : NULL) {
-			case 'xml':
-			case 'js':
-			case 'css':
-				return 'Nette\Templating\DefaultHelpers::escape' . ucfirst($this->context[1]) . "($s)";
-			case 'text':
-				return $s;
+			case Compiler::CONTEXT_COMMENT:
+				return "Nette\\Templating\\Helpers::escapeHtmlComment($s)";
+			case Compiler::CONTENT_JS:
+			case Compiler::CONTENT_CSS:
+				return 'Nette\Templating\Helpers::escape' . ucfirst($context[0]) . "($s)";
 			default:
-				return "\$template->escape($s)";
+				return "Nette\\Templating\\Helpers::escapeHtml($s, ENT_NOQUOTES)";
 			}
+		case Compiler::CONTENT_XML:
+		case Compiler::CONTENT_JS:
+		case Compiler::CONTENT_CSS:
+		case Compiler::CONTENT_ICAL:
+			return 'Nette\Templating\Helpers::escape' . ucfirst($this->compiler->getContentType()) . "($s)";
+		case Compiler::CONTENT_TEXT:
+			return $s;
+		default:
+			return "\$template->escape($s)";
 		}
 	}
 

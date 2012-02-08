@@ -23,7 +23,7 @@ use Nette;
  * @property-write $defaults
  * @property   Nette\ArrayHash $values
  * @property-read bool $valid
- * @property-read ControlGroup $currentGroup
+ * @property   ControlGroup $currentGroup
  * @property-read \ArrayIterator $controls
  * @property-read Form $form
  */
@@ -101,17 +101,17 @@ class Container extends Nette\ComponentModel\Container implements \ArrayAccess
 
 	/**
 	 * Returns the values submitted by the form.
-	 * @return Nette\ArrayHash
+	 * @return Nette\ArrayHash|array
 	 */
-	public function getValues()
+	public function getValues($asArray = FALSE)
 	{
-		$values = new Nette\ArrayHash;
+		$values = $asArray ? array() : new Nette\ArrayHash;
 		foreach ($this->getComponents() as $name => $control) {
 			if ($control instanceof IControl && !$control->isDisabled() && !$control instanceof ISubmitterControl) {
-				$values->$name = $control->getValue();
+				$values[$name] = $control->getValue();
 
 			} elseif ($control instanceof Container) {
-				$values->$name = $control->getValues();
+				$values[$name] = $control->getValues($asArray);
 			}
 		}
 		return $values;

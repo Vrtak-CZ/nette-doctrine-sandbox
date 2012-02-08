@@ -257,11 +257,11 @@ final class Environment
 
 
 	/**
-	 * @return Nette\Http\User
+	 * @return Nette\Security\User
 	 */
 	public static function getUser()
 	{
-		return self::getContext()->getByType('Nette\Http\IUser');
+		return self::getContext()->getByType('Nette\Security\User');
 	}
 
 
@@ -358,11 +358,3 @@ final class Environment
 	}
 
 }
-
-
-
-
-/** @deprecated */
-class Configurator extends Nette\Config\Configurator
-{}
-

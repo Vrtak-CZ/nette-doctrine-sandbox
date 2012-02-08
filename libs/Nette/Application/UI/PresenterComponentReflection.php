@@ -11,7 +11,8 @@
 
 namespace Nette\Application\UI;
 
-use Nette;
+use Nette,
+	Nette\Application\BadRequestException;
 
 
 
@@ -114,6 +115,50 @@ class PresenterComponentReflection extends Nette\Reflection\ClassType
 		} catch (\ReflectionException $e) {
 		}
 		return $cache;
+	}
+
+
+
+	/**
+	 * @return array
+	 */
+	public static function combineArgs(\ReflectionFunctionAbstract $method, $args)
+	{
+		$res = array();
+		$i = 0;
+		foreach ($method->getParameters() as $param) {
+			$name = $param->getName();
+			$def = $param->isDefaultValueAvailable() ? $param->getDefaultValue() : NULL;
+
+			if (!isset($args[$name])) { // NULL treats as none value
+				if ($param->isArray() && !$param->allowsNull()) {
+					$def = (array) $def;
+				}
+				$res[$i++] = $def;
+
+			} else {
+				$val = $args[$name];
+				if ($param->isArray() || is_array($def)) {
+					if (!is_array($val)) {
+						throw new BadRequestException("Invalid value for parameter '$name', expected array.");
+					}
+				} elseif ($param->getClass() || is_object($val)) {
+					// ignore
+				} else {
+					if (!is_scalar($val)) {
+						throw new BadRequestException("Invalid value for parameter '$name', expected scalar.");
+					}
+					if ($def !== NULL) {
+						settype($val, gettype($def));
+						if (($val === FALSE ? '0' : (string) $val) !== (string) $args[$name]) {
+							throw new BadRequestException("Invalid value for parameter '$name', expected ".gettype($def).".");
+						}
+					}
+				}
+				$res[$i++] = $val;
+			}
+		}
+		return $res;
 	}
 
 }

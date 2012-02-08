@@ -12,7 +12,7 @@
 namespace Nette\Database\Diagnostics;
 
 use Nette,
-	Nette\Database\Connection,
+	Nette\Database\Helpers,
 	Nette\Diagnostics\Debugger;
 
 
@@ -28,31 +28,19 @@ class ConnectionPanel extends Nette\Object implements Nette\Diagnostics\IBarPane
 	static public $maxLength = 1000;
 
 	/** @var int logged time */
-	public $totalTime = 0;
+	private $totalTime = 0;
 
 	/** @var array */
-	public $queries = array();
+	private $queries = array();
 
 	/** @var string */
 	public $name;
 
-	/** @var bool explain queries? */
+	/** @var bool|string explain queries? */
 	public $explain = TRUE;
 
 	/** @var bool */
 	public $disabled = FALSE;
-
-
-
-	public static function initialize(Connection $connection)
-	{
-		$panel = new static;
-		Debugger::$blueScreen->addPanel(array($panel, 'renderException'), __CLASS__);
-		if (!Debugger::$productionMode) {
-			$connection->onQuery[] = callback($panel, 'logQuery');
-			Debugger::$bar->addPanel($panel);
-		}
-	}
 
 
 
@@ -70,18 +58,18 @@ class ConnectionPanel extends Nette\Object implements Nette\Diagnostics\IBarPane
 				break;
 			}
 		}
-		$this->totalTime += $result->time;
-		$this->queries[] = array($result->queryString, $params, $result->time, $result->rowCount(), $result->getConnection(), $source);
+		$this->totalTime += $result->getTime();
+		$this->queries[] = array($result->queryString, $params, $result->getTime(), $result->rowCount(), $result->getConnection(), $source);
 	}
 
 
 
-	public function renderException($e)
+	public static function renderException($e)
 	{
 		if ($e instanceof \PDOException && isset($e->queryString)) {
 			return array(
 				'tab' => 'SQL',
-				'panel' => Connection::highlightSql($e->queryString),
+				'panel' => Helpers::dumpSql($e->queryString),
 			);
 		}
 	}
@@ -108,9 +96,10 @@ class ConnectionPanel extends Nette\Object implements Nette\Diagnostics\IBarPane
 			list($sql, $params, $time, $rows, $connection, $source) = $query;
 
 			$explain = NULL; // EXPLAIN is called here to work SELECT FOUND_ROWS()
-			if ($this->explain && preg_match('#\s*SELECT\s#iA', $sql)) {
+			if ($this->explain && preg_match('#\s*\(?\s*SELECT\s#iA', $sql)) {
 				try {
-					$explain = $connection->queryArgs('EXPLAIN ' . $sql, $params)->fetchAll();
+					$cmd = is_string($this->explain) ? $this->explain : 'EXPLAIN';
+					$explain = $connection->queryArgs("$cmd $sql", $params)->fetchAll();
 				} catch (\PDOException $e) {}
 			}
 
@@ -121,7 +110,7 @@ class ConnectionPanel extends Nette\Object implements Nette\Diagnostics\IBarPane
 				$s .= "<br /><a href='#' class='nette-toggler' rel='#nette-DbConnectionPanel-row-$counter'>explain&nbsp;&#x25ba;</a>";
 			}
 
-			$s .= '</td><td class="nette-DbConnectionPanel-sql">' . Connection::highlightSql(self::$maxLength ? Nette\Utils\Strings::truncate($sql, self::$maxLength) : $sql);
+			$s .= '</td><td class="nette-DbConnectionPanel-sql">' . Helpers::dumpSql(self::$maxLength ? Nette\Utils\Strings::truncate($sql, self::$maxLength) : $sql);
 			if ($explain) {
 				$s .= "<table id='nette-DbConnectionPanel-row-$counter' class='nette-collapsed'><tr>";
 				foreach ($explain[0] as $col => $foo) {
@@ -151,8 +140,7 @@ class ConnectionPanel extends Nette\Object implements Nette\Diagnostics\IBarPane
 
 		return empty($this->queries) ? '' :
 			'<style> #nette-debug td.nette-DbConnectionPanel-sql { background: white !important }
-			#nette-debug .nette-DbConnectionPanel-source { color: #BBB !important }
-			#nette-debug nette-DbConnectionPanel tr table { margin: 8px 0; max-height: 150px; overflow:auto } </style>
+			#nette-debug .nette-DbConnectionPanel-source { color: #BBB !important } </style>
 			<h1>Queries: ' . count($this->queries) . ($this->totalTime ? ', time: ' . sprintf('%0.3f', $this->totalTime * 1000) . ' ms' : '') . '</h1>
 			<div class="nette-inner nette-DbConnectionPanel">
 			<table>

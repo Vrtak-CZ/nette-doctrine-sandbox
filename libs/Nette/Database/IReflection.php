@@ -26,6 +26,8 @@ interface IReflection
 		FIELD_BOOL = 'bool',
 		FIELD_INTEGER = 'int',
 		FIELD_FLOAT = 'float',
+		FIELD_DATE = 'date',
+		FIELD_TIME = 'time',
 		FIELD_DATETIME = 'datetime';
 
 	/**
@@ -54,7 +56,7 @@ interface IReflection
 	 *
 	 * @param  string  source table
 	 * @param  string  referencing key
-	 * @return string  array(referenced table, referencing column)
+	 * @return array   array(referenced table, referencing column)
 	 */
 	function getBelongsToReference($table, $key);
 

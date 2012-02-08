@@ -26,9 +26,6 @@ class MySqlDriver extends Nette\Object implements Nette\Database\ISupplementalDr
 	const ERROR_DUPLICATE_ENTRY = 1062;
 	const ERROR_DATA_TRUNCATED = 1265;
 
-	/** @var array */
-	public $supports = array('meta' => TRUE);
-
 	/** @var Nette\Database\Connection */
 	private $connection;
 
@@ -162,6 +159,7 @@ class MySqlDriver extends Nette\Object implements Nette\Database\ISupplementalDr
 				'nullable' => $row['Null'] === 'YES',
 				'default' => $row['Default'],
 				'autoincrement' => $row['Extra'] === 'auto_increment',
+				'primary' => $row['Key'] === 'PRI',
 				'vendor' => (array) $row,
 			);
 		}
@@ -198,7 +196,28 @@ class MySqlDriver extends Nette\Object implements Nette\Database\ISupplementalDr
 	 */
 	public function getForeignKeys($table)
 	{
-		throw new NotImplementedException;
+		$keys = array();
+		$query = 'SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE '
+			. 'WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL AND TABLE_NAME = ' . $this->connection->quote($table);
+
+		foreach ($this->connection->query($query) as $id => $row) {
+			$keys[$id]['name'] = $row['CONSTRAINT_NAME']; // foreign key name
+			$keys[$id]['local'] = $row['COLUMN_NAME']; // local columns
+			$keys[$id]['table'] = $row['REFERENCED_TABLE_NAME']; // referenced table
+			$keys[$id]['foreign'] = $row['REFERENCED_COLUMN_NAME']; // referenced columns
+		}
+
+		return array_values($keys);
+	}
+
+
+
+	/**
+	 * @return bool
+	 */
+	public function isSupported($item)
+	{
+		return $item === self::META;
 	}
 
 }

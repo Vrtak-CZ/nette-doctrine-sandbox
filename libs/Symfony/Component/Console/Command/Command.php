@@ -17,7 +17,6 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Application;
-use Symfony\Component\Console\Helper\HelperSet;
 
 /**
  * Base class for all commands.
@@ -38,7 +37,6 @@ class Command
     private $applicationDefinitionMerged;
     private $code;
     private $synopsis;
-    private $helperSet;
 
     /**
      * Constructor.
@@ -77,31 +75,6 @@ class Command
     public function setApplication(Application $application = null)
     {
         $this->application = $application;
-        if ($application) {
-            $this->setHelperSet($application->getHelperSet());
-        } else {
-            $this->helperSet = null;
-        }
-    }
-
-    /**
-     * Sets the helper set.
-     *
-     * @param HelperSet $helperSet A HelperSet instance
-     */
-    public function setHelperSet(HelperSet $helperSet)
-    {
-        $this->helperSet = $helperSet;
-    }
-
-    /**
-     * Gets the helper set.
-     *
-     * @return HelperSet A HelperSet instance
-     */
-    public function getHelperSet()
-    {
-        return $this->helperSet;
     }
 
     /**
@@ -257,7 +230,7 @@ class Command
     /**
      * Sets an array of argument and option instances.
      *
-     * @param array|InputDefinition $definition An array of argument and option instances or a definition instance
+     * @param array|Definition $definition An array of argument and option instances or a definition instance
      *
      * @return Command The current instance
      *
@@ -501,7 +474,7 @@ class Command
      */
     public function getHelper($name)
     {
-        return $this->helperSet->get($name);
+        return $this->application->getHelperSet()->get($name);
     }
 
     /**

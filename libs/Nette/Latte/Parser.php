@@ -17,7 +17,7 @@ use Nette,
 
 
 /**
- * Compile-time filter Latte.
+ * Latte parser.
  *
  * @author     David Grudl
  */
@@ -26,8 +26,20 @@ class Parser extends Nette\Object
 	/** @internal regular expression for single & double quoted PHP string */
 	const RE_STRING = '\'(?:\\\\.|[^\'\\\\])*\'|"(?:\\\\.|[^"\\\\])*"';
 
-	/** @internal special HTML tag or attribute prefix */
+	/** @internal special HTML attribute prefix */
 	const N_PREFIX = 'n:';
+
+	/** @var string default macro syntax */
+	public $defaultSyntax = 'latte';
+
+	/** @var array */
+	public $syntaxes = array(
+		'latte' => array('\\{(?![\\s\'"{}])', '\\}'), // {...}
+		'double' => array('\\{\\{(?![\\s\'"{}])', '\\}\\}'), // {{...}}
+		'asp' => array('<%\s*', '\s*%>'), /* <%...%> */
+		'python' => array('\\{[{%]\s*', '\s*[%}]\\}'), // {% ... %} | {{ ... }}
+		'off' => array('[^\x00-\xFF]', ''),
+	);
 
 	/** @var string */
 	private $macroRe;
@@ -35,31 +47,25 @@ class Parser extends Nette\Object
 	/** @var string source template */
 	private $input;
 
-	/** @var string output code */
+	/** @var array of Token */
 	private $output;
 
 	/** @var int  position on source template */
 	private $offset;
 
-	/** @var array of [name => array of IMacro] */
-	private $macros;
-
-	/** @var SplObjectStorage */
-	private $macroHandlers;
-
-	/** @var array of HtmlNode */
-	private $htmlNodes = array();
-
-	/** @var array of MacroNode */
-	private $macroNodes = array();
-
 	/** @var array */
-	public $context;
+	private $context;
 
 	/** @var string */
-	public $templateId;
+	private $lastTag;
 
-	/** @internal Context-aware escaping states */
+	/** @var string used by filter() */
+	private $endTag;
+
+	/** @var bool */
+	private $xmlMode;
+
+	/** @internal states */
 	const CONTEXT_TEXT = 'text',
 		CONTEXT_CDATA = 'cdata',
 		CONTEXT_TAG = 'tag',
@@ -69,100 +75,49 @@ class Parser extends Nette\Object
 
 
 
-	public function __construct()
-	{
-		$this->macroHandlers = new \SplObjectStorage;
-		$this->setDelimiters('\\{(?![\\s\'"{}])', '\\}');
-		$this->context = array(self::CONTEXT_NONE, 'text');
-	}
-
-
-
-	/**
-	 * Adds new macro
-	 * @param
-	 * @return Parser  provides a fluent interface
-	 */
-	public function addMacro($name, IMacro $macro)
-	{
-		$this->macros[$name][] = $macro;
-		$this->macroHandlers->attach($macro);
-		return $this;
-	}
-
-
-
 	/**
 	 * Process all {macros} and <tags/>.
 	 * @param  string
-	 * @return string
+	 * @return array
 	 */
-	public function parse($s)
+	public function parse($input)
 	{
-		if (!Strings::checkEncoding($s)) {
-			throw new ParseException('Template is not valid UTF-8 stream.');
+		if (substr($input, 0, 3) === "\xEF\xBB\xBF") { // BOM
+	    	$input = substr($input, 3);
+	    }
+		if (!Strings::checkEncoding($input)) {
+			throw new Nette\InvalidArgumentException('Template is not valid UTF-8 stream.');
 		}
-		$s = str_replace("\r\n", "\n", $s);
-
-		$this->templateId = Strings::random();
-		$this->input = & $s;
+		$input = str_replace("\r\n", "\n", $input);
+		$this->input = $input;
+		$this->output = array();
 		$this->offset = 0;
-		$this->output = '';
-		$this->htmlNodes = $this->macroNodes = array();
 
-		foreach ($this->macroHandlers as $handler) {
-			$handler->initialize($this);
-		}
+		$this->setSyntax($this->defaultSyntax);
+		$this->setContext(self::CONTEXT_TEXT);
+		$this->lastTag = $this->endTag = NULL;
+		$this->xmlMode = (bool) preg_match('#^<\?xml\s#m', $input);
 
-		$len = strlen($s);
+		while ($this->offset < strlen($input)) {
+			$matches = $this->{"context".$this->context[0]}();
 
-		try {
-			while ($this->offset < $len) {
-				$matches = $this->{"context".$this->context[0]}();
+			if (!$matches) { // EOF
+				break;
 
-				if (!$matches) { // EOF
-					break;
+			} elseif (!empty($matches['comment'])) { // {* *}
+				$this->addToken(Token::COMMENT, $matches[0]);
 
-				} elseif (!empty($matches['comment'])) { // {* *}
-
-				} elseif (!empty($matches['macro'])) { // {macro}
-					list($macroName, $macroArgs, $macroModifiers) = $this->parseMacro($matches['macro']);
-					$isRightmost = $this->offset >= $len || $this->input[$this->offset] === "\n";
-					$this->writeMacro($macroName, $macroArgs, $macroModifiers, $isRightmost);
-
-				} else { // common behaviour
-					$this->output .= $matches[0];
-				}
+			} elseif (!empty($matches['macro'])) { // {macro}
+				$token = $this->addToken(Token::MACRO, $matches[0]);
+				list($token->name, $token->value, $token->modifiers) = $this->parseMacro($matches['macro']);
 			}
-		} catch (ParseException $e) {
-			if (!$e->sourceLine) {
-				$e->sourceLine = $this->getLine();
-			}
-			throw $e;
+
+			$this->filter();
 		}
 
-		$this->output .= substr($this->input, $this->offset);
-
-		foreach ($this->htmlNodes as $node) {
-			if (!empty($node->attrs)) {
-				throw new ParseException("Missing end tag </$node->name> for macro-attribute " . self::N_PREFIX
-					. implode(' and ' . self::N_PREFIX, array_keys($node->attrs)) . ".", 0, $this->getLine());
-			}
+		if ($this->offset < strlen($input)) {
+			$this->addToken(Token::TEXT, substr($this->input, $this->offset));
 		}
-
-		$prologs = $epilogs = '';
-		foreach ($this->macroHandlers as $handler) {
-			$res = $handler->finalize();
-			$handlerName = get_class($handler);
-			$prologs .= empty($res[0]) ? '' : "<?php\n// prolog $handlerName\n$res[0]\n?>";
-			$epilogs = (empty($res[1]) ? '' : "<?php\n// epilog $handlerName\n$res[1]\n?>") . $epilogs;
-		}
-		$this->output = ($prologs ? $prologs . "<?php\n//\n// main template\n//\n?>\n" : '') . $this->output . $epilogs;
-
-		if ($this->macroNodes) {
-			throw new ParseException("There are unclosed macros.", 0, $this->getLine());
-		}
-
 		return $this->output;
 	}
 
@@ -175,31 +130,20 @@ class Parser extends Nette\Object
 	{
 		$matches = $this->match('~
 			(?:(?<=\n|^)[ \t]*)?<(?P<closing>/?)(?P<tag>[a-z0-9:]+)|  ##  begin of HTML tag <tag </tag - ignores <!DOCTYPE
-			<(?P<htmlcomment>!--)|           ##  begin of HTML comment <!--
-			'.$this->macroRe.'           ##  curly tag
+			<(?P<htmlcomment>!--)|     ##  begin of HTML comment <!--
+			'.$this->macroRe.'         ##  macro
 		~xsi');
 
-		if (!$matches || !empty($matches['macro']) || !empty($matches['comment'])) { // EOF or {macro}
+		if (!empty($matches['htmlcomment'])) { // <!--
+			$this->addToken(Token::TAG_BEGIN, $matches[0]);
+			$this->setContext(self::CONTEXT_COMMENT);
 
-		} elseif (!empty($matches['htmlcomment'])) { // <!--
-			$this->context = array(self::CONTEXT_COMMENT);
-
-		} elseif (empty($matches['closing'])) { // <tag
-			$this->htmlNodes[] = $node = new HtmlNode($matches['tag']);
-			$node->offset = strlen($this->output);
-			$this->context = array(self::CONTEXT_TAG);
-
-		} else { // </tag
-			do {
-				$node = array_pop($this->htmlNodes);
-				if (!$node) {
-					$node = new HtmlNode($matches['tag']);
-				}
-			} while (strcasecmp($node->name, $matches['tag']));
-			$this->htmlNodes[] = $node;
-			$node->closing = TRUE;
-			$node->offset = strlen($this->output);
-			$this->context = array(self::CONTEXT_TAG);
+		} elseif (!empty($matches['tag'])) { // <tag or </tag
+			$token = $this->addToken(Token::TAG_BEGIN, $matches[0]);
+			$token->name = $matches['tag'];
+			$token->closing = (bool) $matches['closing'];
+			$this->lastTag = $matches['closing'] . strtolower($matches['tag']);
+			$this->setContext(self::CONTEXT_TAG);
 		}
 		return $matches;
 	}
@@ -211,16 +155,17 @@ class Parser extends Nette\Object
 	 */
 	private function contextCData()
 	{
-		$node = end($this->htmlNodes);
 		$matches = $this->match('~
-			</'.$node->name.'(?![a-z0-9:])| ##  end HTML tag </tag
-			'.$this->macroRe.'           ##  curly tag
+			</(?P<tag>'.$this->lastTag.')(?![a-z0-9:])| ##  end HTML tag </tag
+			'.$this->macroRe.'              ##  macro
 		~xsi');
 
-		if ($matches && empty($matches['macro']) && empty($matches['comment'])) { // </tag
-			$node->closing = TRUE;
-			$node->offset = strlen($this->output);
-			$this->context = array(self::CONTEXT_TAG);
+		if (!empty($matches['tag'])) { // </tag
+			$token = $this->addToken(Token::TAG_BEGIN, $matches[0]);
+			$token->name = $this->lastTag;
+			$token->closing = TRUE;
+			$this->lastTag = '/' . $this->lastTag;
+			$this->setContext(self::CONTEXT_TAG);
 		}
 		return $matches;
 	}
@@ -233,62 +178,30 @@ class Parser extends Nette\Object
 	private function contextTag()
 	{
 		$matches = $this->match('~
-			(?P<end>\ ?/?>)(?P<tagnewline>[ \t]*\n)?|  ##  end of HTML tag
-			'.$this->macroRe.'|          ##  curly tag
+			(?P<end>\ ?/?>)([ \t]*\n)?|  ##  end of HTML tag
+			'.$this->macroRe.'|          ##  macro
 			\s*(?P<attr>[^\s/>={]+)(?:\s*=\s*(?P<value>["\']|[^\s/>{]+))? ## begin of HTML attribute
 		~xsi');
 
-		if (!$matches || !empty($matches['macro']) || !empty($matches['comment'])) { // EOF or {macro}
+		if (!empty($matches['end'])) { // end of HTML tag />
+			$this->addToken(Token::TAG_END, $matches[0]);
+			$this->setContext(!$this->xmlMode && in_array($this->lastTag, array('script', 'style')) ? self::CONTEXT_CDATA : self::CONTEXT_TEXT);
 
-		} elseif (!empty($matches['end'])) { // end of HTML tag />
-			$node = end($this->htmlNodes);
-			$isEmpty = !$node->closing && (Strings::contains($matches['end'], '/') || $node->isEmpty);
+		} elseif (!empty($matches['attr'])) { // HTML attribute
+			$token = $this->addToken(Token::ATTRIBUTE, $matches[0]);
+			$token->name = $matches['attr'];
+			$token->value = isset($matches['value']) ? $matches['value'] : '';
 
-			if ($isEmpty) {
-				$matches[0] = (Nette\Utils\Html::$xhtml ? ' />' : '>')
-					. (isset($matches['tagnewline']) ? $matches['tagnewline'] : '');
-			}
-
-			if (!empty($node->attrs)) {
-				$code = substr($this->output, $node->offset) . $matches[0];
-				$this->output = substr($this->output, 0, $node->offset);
-				$this->writeAttrsMacro($code, $node->attrs, $node->closing);
-				if ($isEmpty) {
-					$this->writeAttrsMacro('', $node->attrs, TRUE);
-				}
-				$matches[0] = ''; // remove from output
-			}
-
-			if ($isEmpty) {
-				$node->closing = TRUE;
-			}
-
-			if (!$node->closing && (strcasecmp($node->name, 'script') === 0 || strcasecmp($node->name, 'style') === 0)) {
-				$this->context = array(self::CONTEXT_CDATA, strcasecmp($node->name, 'style') ? 'js' : 'css');
-			} else {
-				$this->context = array(self::CONTEXT_TEXT);
-				if ($node->closing) {
-					array_pop($this->htmlNodes);
-				}
-			}
-
-		} else { // HTML attribute
-			$name = $matches['attr'];
-			$value = isset($matches['value']) ? $matches['value'] : '';
-			$node = end($this->htmlNodes);
-
-			if (Strings::startsWith($name, self::N_PREFIX)) {
-				$name = substr($name, strlen(self::N_PREFIX));
-				if ($value === '"' || $value === "'") {
-					if ($matches = $this->match('~(.*?)' . $value . '~xsi')) { // overwrites $matches
-						$value = $matches[1];
+			if ($token->value === '"' || $token->value === "'") { // attribute = "'
+				if (Strings::startsWith($token->name, self::N_PREFIX)) {
+					$token->value = '';
+					if ($m = $this->match('~(.*?)' . $matches['value'] . '~xsi')) {
+						$token->value = $m[1];
+						$token->text .= $m[0];
 					}
+				} else {
+					$this->setContext(self::CONTEXT_ATTRIBUTE, $matches['value']);
 				}
-				$node->attrs[$name] = $value;
-				$matches[0] = ''; // remove from output
-
-			} elseif ($value === '"' || $value === "'") { // attribute = "'
-				$this->context = array(self::CONTEXT_ATTRIBUTE, $name, $value);
 			}
 		}
 		return $matches;
@@ -302,12 +215,13 @@ class Parser extends Nette\Object
 	private function contextAttribute()
 	{
 		$matches = $this->match('~
-			(' . $this->context[2] . ')|      ##  1) end of HTML attribute
-			'.$this->macroRe.'                ##  curly tag
+			(?P<quote>'.$this->context[1].')|  ##  end of HTML attribute
+			'.$this->macroRe.'                 ##  macro
 		~xsi');
 
-		if ($matches && empty($matches['macro']) && empty($matches['comment'])) { // (attribute end) '"
-			$this->context = array(self::CONTEXT_TAG);
+		if (!empty($matches['quote'])) { // (attribute end) '"
+			$this->addToken(Token::TEXT, $matches[0]);
+			$this->setContext(self::CONTEXT_TAG);
 		}
 		return $matches;
 	}
@@ -320,12 +234,13 @@ class Parser extends Nette\Object
 	private function contextComment()
 	{
 		$matches = $this->match('~
-			(--\s*>)|                    ##  1) end of HTML comment
-			'.$this->macroRe.'           ##  curly tag
+			(?P<htmlcomment>--\s*>)|   ##  end of HTML comment
+			'.$this->macroRe.'         ##  macro
 		~xsi');
 
-		if ($matches && empty($matches['macro']) && empty($matches['comment'])) { // --\s*>
-			$this->context = array(self::CONTEXT_TEXT);
+		if (!empty($matches['htmlcomment'])) { // --\s*>
+			$this->addToken(Token::TAG_END, $matches[0]);
+			$this->setContext(self::CONTEXT_TEXT);
 		}
 		return $matches;
 	}
@@ -338,7 +253,7 @@ class Parser extends Nette\Object
 	private function contextNone()
 	{
 		$matches = $this->match('~
-			'.$this->macroRe.'           ##  curly tag
+			'.$this->macroRe.'     ##  macro
 		~xsi');
 		return $matches;
 	}
@@ -353,7 +268,10 @@ class Parser extends Nette\Object
 	private function match($re)
 	{
 		if ($matches = Strings::match($this->input, $re, PREG_OFFSET_CAPTURE, $this->offset)) {
-			$this->output .= substr($this->input, $this->offset, $matches[0][1] - $this->offset);
+			$value = substr($this->input, $this->offset, $matches[0][1] - $this->offset);
+			if ($value !== '') {
+				$this->addToken(Token::TEXT, $value);
+			}
 			$this->offset = $matches[0][1] + strlen($matches[0][0]);
 			foreach ($matches as $k => $v) $matches[$k] = $v[0];
 		}
@@ -363,12 +281,30 @@ class Parser extends Nette\Object
 
 
 	/**
-	 * Returns current line number.
-	 * @return int
+	 * @return Parser  provides a fluent interface
 	 */
-	public function getLine()
+	public function setContext($context, $quote = NULL)
 	{
-		return $this->input && $this->offset ? substr_count($this->input, "\n", 0, $this->offset - 1) + 1 : NULL;
+		$this->context = array($context, $quote);
+		return $this;
+	}
+
+
+
+	/**
+	 * Changes macro delimiters.
+	 * @param  string
+	 * @return Parser  provides a fluent interface
+	 */
+	public function setSyntax($type)
+	{
+		$type = $type ?: $this->defaultSyntax;
+		if (isset($this->syntaxes[$type])) {
+			$this->setDelimiters($this->syntaxes[$type][0], $this->syntaxes[$type][1]);
+		} else {
+			throw new Nette\InvalidArgumentException("Unknown syntax '$type'");
+		}
+		return $this;
 	}
 
 
@@ -377,182 +313,20 @@ class Parser extends Nette\Object
 	 * Changes macro delimiters.
 	 * @param  string  left regular expression
 	 * @param  string  right regular expression
-	 * @return Engine  provides a fluent interface
+	 * @return Parser  provides a fluent interface
 	 */
 	public function setDelimiters($left, $right)
 	{
 		$this->macroRe = '
 			(?P<comment>' . $left . '\\*.*?\\*' . $right . '\n{0,2})|
 			' . $left . '
-				(?P<macro>(?:' . self::RE_STRING . '|[^\'"]+?)*?)
+				(?P<macro>(?:' . self::RE_STRING . '|\{
+						(?P<inner>' . self::RE_STRING . '|\{(?P>inner)\}|[^\'"{}])*+
+				\}|[^\'"{}])+?)
 			' . $right . '
 			(?P<rmargin>[ \t]*(?=\n))?
 		';
 		return $this;
-	}
-
-
-
-	/********************* macros ****************d*g**/
-
-
-
-	/**
-	 * Generates code for {macro ...} to the output.
-	 * @param  string
-	 * @param  string
-	 * @param  string
-	 * @param  bool
-	 * @return void
-	 */
-	public function writeMacro($name, $args = NULL, $modifiers = NULL, $isRightmost = FALSE)
-	{
-		$isLeftmost = trim(substr($this->output, $leftOfs = strrpos("\n$this->output", "\n"))) === '';
-
-		if ($name[0] === '/') { // closing
-			$node = end($this->macroNodes);
-
-			if (!$node || ("/$node->name" !== $name && '/' !== $name) || $modifiers
-				|| ($args && $node->args && !Strings::startsWith("$node->args ", "$args "))
-			) {
-				$name .= $args ? ' ' : '';
-				throw new ParseException("Unexpected macro {{$name}{$args}{$modifiers}}"
-					. ($node ? ", expecting {/$node->name}" . ($args && $node->args ? " or eventually {/$node->name $node->args}" : '') : ''),
-					0, $this->getLine());
-			}
-
-			array_pop($this->macroNodes);
-			if (!$node->args) {
-				$node->setArgs($args);
-			}
-			if ($isLeftmost && $isRightmost) {
-				$this->output = substr($this->output, 0, $leftOfs); // alone macro -> remove indentation
-			}
-
-			$code = $node->close(substr($this->output, $node->offset));
-
-			if (!$isLeftmost && $isRightmost && substr($code, -2) === '?>') {
-				$code .= "\n"; // double newline to avoid newline eating by PHP
-			}
-			$this->output = substr($this->output, 0, $node->offset) . $node->content. $code;
-
-		} else { // opening
-			list($node, $code) = $this->expandMacro($name, $args, $modifiers);
-			if (!$node->isEmpty) {
-				$this->macroNodes[] = $node;
-			}
-
-			if ($isRightmost) {
-				if ($isLeftmost && substr($code, 0, 11) !== '<?php echo ') {
-					$this->output = substr($this->output, 0, $leftOfs); // alone macro without output -> remove indentation
-				} elseif (substr($code, -2) === '?>') {
-					$code .= "\n"; // double newline to avoid newline eating by PHP
-				}
-			}
-
-			$this->output .= $code;
-			$node->offset = strlen($this->output);
-		}
-	}
-
-
-
-	/**
-	 * Generates code for macro <tag n:attr> to the output.
-	 * @param  string
-	 * @param  array
-	 * @param  bool
-	 * @return void
-	 */
-	public function writeAttrsMacro($code, $attrs, $closing)
-	{
-		$left = $right = array();
-		foreach ($this->macros as $name => $foo) {
-			if ($name[0] === '@') {
-				$name = substr($name, 1);
-				if (isset($attrs[$name])) {
-					if (!$closing) {
-						$pos = strrpos($code, '>');
-						if ($code[$pos-1] === '/') {
-							$pos--;
-						}
-						list(, $macroCode) = $this->expandMacro("@$name", $attrs[$name]);
-						$code = substr_replace($code, $macroCode, $pos, 0);
-					}
-					unset($attrs[$name]);
-				}
-			}
-
-			$macro = $closing ? "/$name" : $name;
-			if (isset($attrs[$name])) {
-				if ($closing) {
-					$right[] = array($macro, '');
-				} else {
-					array_unshift($left, array($macro, $attrs[$name]));
-				}
-			}
-
-			$innerName = "inner-$name";
-			if (isset($attrs[$innerName])) {
-				if ($closing) {
-					$left[] = array($macro, '');
-				} else {
-					array_unshift($right, array($macro, $attrs[$innerName]));
-				}
-			}
-
-			$tagName = "tag-$name";
-			if (isset($attrs[$tagName])) {
-				array_unshift($left, array($name, $attrs[$tagName]));
-				$right[] = array("/$name", '');
-			}
-
-			unset($attrs[$name], $attrs[$innerName], $attrs[$tagName]);
-		}
-
-		if ($attrs) {
-			throw new ParseException("Unknown macro-attribute " . self::N_PREFIX
-				. implode(' and ' . self::N_PREFIX, array_keys($attrs)), 0, $this->getLine());
-		}
-
-		foreach ($left as $item) {
-			$this->writeMacro($item[0], $item[1]);
-			if (substr($this->output, -2) === '?>') {
-				$this->output .= "\n";
-			}
-		}
-		$this->output .= $code;
-
-		foreach ($right as $item) {
-			$this->writeMacro($item[0], $item[1]);
-			if (substr($this->output, -2) === '?>') {
-				$this->output .= "\n";
-			}
-		}
-	}
-
-
-
-	/**
-	 * Expands macro and returns node & code.
-	 * @param  string
-	 * @param  string
-	 * @param  string
-	 * @return array(MacroNode, string)
-	 */
-	public function expandMacro($name, $args, $modifiers = NULL)
-	{
-		if (empty($this->macros[$name])) {
-			throw new ParseException("Unknown macro {{$name}}", 0, $this->getLine());
-		}
-		foreach (array_reverse($this->macros[$name]) as $macro) {
-			$node = new MacroNode($macro, $name, $args, $modifiers, $this->macroNodes ? end($this->macroNodes) : NULL);
-			$code = $macro->nodeOpened($node);
-			if ($code !== FALSE) {
-				return array($node, $code);
-			}
-		}
-		throw new ParseException("Unhandled macro {{$name}}", 0, $this->getLine());
 	}
 
 
@@ -582,6 +356,51 @@ class Parser extends Nette\Object
 			}
 		}
 		return array($match['name'], trim($match['args']), $match['modifiers']);
+	}
+
+
+
+	private function addToken($type, $text)
+	{
+		$this->output[] = $token = new Token;
+		$token->type = $type;
+		$token->text = $text;
+		$token->line = substr_count($this->input, "\n", 0, max(1, $this->offset - 1)) + 1;
+		return $token;
+	}
+
+
+
+	/**
+	 * Process low-level macros.
+	 */
+	protected function filter()
+	{
+		$token = end($this->output);
+		if ($token->type === Token::MACRO && $token->name === '/syntax') {
+			$this->setSyntax($this->defaultSyntax);
+			$token->type = Token::COMMENT;
+
+		} elseif ($token->type === Token::MACRO && $token->name === 'syntax') {
+			$this->setSyntax($token->value);
+			$token->type = Token::COMMENT;
+
+		} elseif ($token->type === Token::ATTRIBUTE && $token->name === 'n:syntax') {
+			$this->setSyntax($token->value);
+			$this->endTag = '/' . $this->lastTag;
+			$token->type = Token::COMMENT;
+
+		} elseif ($token->type === Token::TAG_END && $this->lastTag === $this->endTag) {
+			$this->setSyntax($this->defaultSyntax);
+
+		} elseif ($token->type === Token::MACRO && $token->name === 'contentType') {
+			if (preg_match('#html|xml#', $token->value, $m)) {
+				$this->xmlMode = $m[0] === 'xml';
+				$this->setContext(self::CONTEXT_TEXT);
+			} else {
+				$this->setContext(self::CONTEXT_NONE);
+			}
+		}
 	}
 
 }

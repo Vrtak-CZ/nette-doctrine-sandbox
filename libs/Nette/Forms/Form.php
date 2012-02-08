@@ -23,7 +23,7 @@ use Nette;
  * @property   mixed $action
  * @property   string $method
  * @property-read array $groups
- * @property-read Nette\Localization\ITranslator|NULL $translator
+ * @property   Nette\Localization\ITranslator|NULL $translator
  * @property-read bool $anchored
  * @property-read ISubmitterControl|FALSE $submitted
  * @property-read bool $success
@@ -359,7 +359,7 @@ class Form extends Container
 	{
 		if ($this->submittedBy === NULL && count($this->getControls())) {
 			$this->getHttpData();
-			$this->submittedBy = !empty($this->httpData);
+			$this->submittedBy = $this->httpData !== NULL;
 		}
 		return $this->submittedBy;
 	}
@@ -400,7 +400,7 @@ class Form extends Container
 			if (!$this->isAnchored()) {
 				throw new Nette\InvalidStateException('Form is not anchored and therefore can not determine whether it was submitted.');
 			}
-			$this->httpData = (array) $this->receiveHttpData();
+			$this->httpData = $this->receiveHttpData();
 		}
 		return $this->httpData;
 	}
@@ -483,9 +483,9 @@ class Form extends Container
 	 * Returns the values submitted by the form.
 	 * @return array
 	 */
-	public function getValues()
+	public function getValues($asArray = FALSE)
 	{
-		$values = parent::getValues();
+		$values = parent::getValues($asArray);
 		unset($values[self::TRACKER_ID], $values[self::PROTECTOR_ID]);
 		return $values;
 	}

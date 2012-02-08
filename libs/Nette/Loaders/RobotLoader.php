@@ -71,17 +71,13 @@ class RobotLoader extends AutoLoader
 
 	/**
 	 * Register autoloader.
-	 * @return void
+	 * @return RobotLoader  provides a fluent interface
 	 */
 	public function register()
 	{
 		$this->list = $this->getCache()->load($this->getKey(), callback($this, '_rebuildCallback'));
-
-		if (isset($this->list[strtolower(__CLASS__)]) && class_exists('Nette\Loaders\NetteLoader', FALSE)) {
-			NetteLoader::getInstance()->unregister();
-		}
-
 		parent::register();
+		return $this;
 	}
 
 
@@ -249,7 +245,7 @@ class RobotLoader extends AutoLoader
 					$path = $dir->getPathname();
 					if (is_file("$path/netterobots.txt")) {
 						foreach (file("$path/netterobots.txt") as $s) {
-							if ($matches = Strings::match($s, '#^disallow\\s*:\\s*(\\S+)#i')) {
+							if ($matches = Strings::match($s, '#^(?:disallow\\s*:)?\\s*(\\S+)#i')) {
 								$disallow[$path . str_replace('/', DIRECTORY_SEPARATOR, rtrim('/' . ltrim($matches[1], '/'), '/'))] = TRUE;
 							}
 						}
@@ -301,7 +297,7 @@ class RobotLoader extends AutoLoader
 			return;
 		}
 
-		foreach (token_get_all($s) as $token) {
+		foreach (@token_get_all($s) as $token) { // intentionally @
 			if (is_array($token)) {
 				switch ($token[0]) {
 				case T_COMMENT:

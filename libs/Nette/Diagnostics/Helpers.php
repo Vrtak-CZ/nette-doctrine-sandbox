@@ -19,7 +19,6 @@ use Nette;
  * Rendering helpers for Debugger.
  *
  * @author     David Grudl
- * @internal
  */
 final class Helpers
 {
@@ -91,9 +90,9 @@ final class Helpers
 
 		} elseif (is_string($var)) {
 			if (Debugger::$maxLen && strlen($var) > Debugger::$maxLen) {
-				$s = htmlSpecialChars(substr($var, 0, Debugger::$maxLen), ENT_NOQUOTES) . ' ... ';
+				$s = htmlSpecialChars(substr($var, 0, Debugger::$maxLen), ENT_NOQUOTES, 'ISO-8859-1') . ' ... ';
 			} else {
-				$s = htmlSpecialChars($var, ENT_NOQUOTES);
+				$s = htmlSpecialChars($var, ENT_NOQUOTES, 'ISO-8859-1');
 			}
 			$s = strtr($s, preg_match($reBinary, $s) || preg_last_error() ? $tableBin : $tableUtf);
 			$len = strlen($var);
@@ -189,18 +188,34 @@ final class Helpers
 	 * @param  string
 	 * @return string
 	 */
-	public static function clickableDump($dump)
+	public static function clickableDump($dump, $collapsed = FALSE)
 	{
 		return '<pre class="nette-dump">' . preg_replace_callback(
 			'#^( *)((?>[^(\r\n]{1,200}))\((\d+)\) <code>#m',
-			function ($m) {
+			function ($m) use ($collapsed) {
 				return "$m[1]<a href='#' rel='next'>$m[2]($m[3]) "
-					. (trim($m[1]) || $m[3] < 7
+					. (($m[1] || !$collapsed) && ($m[3] < 7)
 					? '<abbr>&#x25bc;</abbr> </a><code>'
 					: '<abbr>&#x25ba;</abbr> </a><code class="nette-collapsed">');
 			},
 			self::htmlDump($dump)
 		) . '</pre>';
+	}
+
+
+
+	public static function findTrace(array $trace, $method, & $index = NULL)
+	{
+		$m = explode('::', $method);
+		foreach ($trace as $i => $item) {
+			if (isset($item['function']) && $item['function'] === end($m)
+				&& isset($item['class']) === isset($m[1])
+				&& (!isset($item['class']) || $item['class'] === $m[0] || is_subclass_of($item['class'], $m[0])))
+			{
+				$index = $i;
+				return $item;
+			}
+		}
 	}
 
 }

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Nette Framework (version 2.0-dev released on 2012-01-06, http://nette.org)
+ * Nette Framework (version 2.0-dev released on 2012-02-03, http://nette.org)
  *
  * Copyright (c) 2004, 2012 David Grudl (http://davidgrudl.com)
  *
@@ -18,6 +18,7 @@ error_reporting(E_ALL | E_STRICT);
 @set_magic_quotes_runtime(FALSE); // @ - deprecated since PHP 5.3.0
 iconv_set_encoding('internal_encoding', 'UTF-8');
 extension_loaded('mbstring') && mb_internal_encoding('UTF-8');
+umask(0);
 @header('X-Powered-By: Nette Framework'); // @ - headers may be sent
 @header('Content-Type: text/html; charset=utf-8'); // @ - headers may be sent
 
@@ -43,6 +44,7 @@ require_once __DIR__ . '/Loaders/NetteLoader.php';
 Nette\Loaders\NetteLoader::getInstance()->register();
 
 require_once __DIR__ . '/Diagnostics/Helpers.php';
+require_once __DIR__ . '/Diagnostics/shortcuts.php';
 require_once __DIR__ . '/Utils/Html.php';
 Nette\Diagnostics\Debugger::_init();
 
@@ -59,15 +61,4 @@ Nette\Utils\SafeStream::register();
 function callback($callback, $m = NULL)
 {
 	return ($m === NULL && $callback instanceof Nette\Callback) ? $callback : new Nette\Callback($callback, $m);
-}
-
-
-
-/**
- * Nette\Diagnostics\Debugger::dump shortcut.
- */
-function dump($var)
-{
-	foreach (func_get_args() as $arg) Nette\Diagnostics\Debugger::dump($arg);
-	return $var;
 }

@@ -13,7 +13,7 @@ namespace Nette\Latte\Macros;
 
 use Nette,
 	Nette\Latte,
-	Nette\Latte\ParseException,
+	Nette\Latte\CompileException,
 	Nette\Latte\MacroNode;
 
 
@@ -46,9 +46,9 @@ class CoreMacros extends MacroSet
 {
 
 
-	public static function install(Latte\Parser $parser)
+	public static function install(Latte\Compiler $compiler)
 	{
-		$me = new static($parser);
+		$me = new static($compiler);
 
 		$me->addMacro('if', array($me, 'macroIf'), array($me, 'macroEndIf'));
 		$me->addMacro('elseif', 'elseif (%node.args):');
@@ -56,7 +56,7 @@ class CoreMacros extends MacroSet
 		$me->addMacro('ifset', 'if (isset(%node.args)):', 'endif');
 		$me->addMacro('elseifset', 'elseif (isset(%node.args)):');
 
-		$me->addMacro('foreach', array($me, 'macroForeach'), '$iterations++; endforeach; array_pop($_l->its); $iterator = end($_l->its)');
+		$me->addMacro('foreach', '', array($me, 'macroEndForeach'));
 		$me->addMacro('for', 'for (%node.args):', 'endfor');
 		$me->addMacro('while', 'while (%node.args):', 'endwhile');
 		$me->addMacro('continueIf', 'if (%node.args) continue');
@@ -77,15 +77,13 @@ class CoreMacros extends MacroSet
 		$me->addMacro('=', array($me, 'macroExpr'));
 		$me->addMacro('?', array($me, 'macroExpr'));
 
-		$me->addMacro('syntax', array($me, 'macroSyntax'), array($me, 'macroSyntax'));
 		$me->addMacro('capture', array($me, 'macroCapture'), array($me, 'macroCaptureEnd'));
 		$me->addMacro('include', array($me, 'macroInclude'));
 		$me->addMacro('use', array($me, 'macroUse'));
 
-		$me->addMacro('@href', NULL, NULL); // TODO: placeholder
-		$me->addMacro('@class', array($me, 'macroClass'));
-		$me->addMacro('@attr', array($me, 'macroAttr'));
-		$me->addMacro('attr', array($me, 'macroOldAttr'));
+		$me->addMacro('class', NULL, NULL, array($me, 'macroClass'));
+		$me->addMacro('attr', array($me, 'macroOldAttr'), '', array($me, 'macroAttr'));
+		$me->addMacro('href', NULL); // TODO: placeholder
 	}
 
 
@@ -97,7 +95,7 @@ class CoreMacros extends MacroSet
 	public function finalize()
 	{
 		return array('list($_l, $_g) = Nette\Latte\Macros\CoreMacros::initRuntime($template, '
-			. var_export($this->parser->templateId, TRUE) . ')');
+			. var_export($this->getCompiler()->getTemplateId(), TRUE) . ')');
 	}
 
 
@@ -114,6 +112,9 @@ class CoreMacros extends MacroSet
 		if ($node->data->capture = ($node->args === '')) {
 			return 'ob_start()';
 		}
+		if ($node->htmlNode && isset($node->htmlNode->macroAttrs['tag-if'])) {
+			return $writer->write($node->htmlNode->closing ? 'if (array_pop($_l->ifs)):' : 'if ($_l->ifs[] = (%node.args)):');
+		}
 		return $writer->write('if (%node.args):');
 	}
 
@@ -126,7 +127,7 @@ class CoreMacros extends MacroSet
 	{
 		if ($node->data->capture) {
 			if ($node->args === '') {
-				throw new ParseException('Missing condition in {if} macro.');
+				throw new CompileException('Missing condition in {if} macro.');
 			}
 			return $writer->write('if (%node.args) '
 				. (isset($node->data->else) ? '{ ob_end_clean(); ob_end_flush(); }' : 'ob_end_flush();')
@@ -147,7 +148,7 @@ class CoreMacros extends MacroSet
 		$ifNode = $node->parentNode;
 		if ($ifNode && $ifNode->name === 'if' && $ifNode->data->capture) {
 			if (isset($ifNode->data->else)) {
-				throw new ParseException("Macro {if} supports only one {else}.");
+				throw new CompileException("Macro {if} supports only one {else}.");
 			}
 			$ifNode->data->else = TRUE;
 			return 'ob_start()';
@@ -176,49 +177,12 @@ class CoreMacros extends MacroSet
 
 
 	/**
-	 * {syntax name}
-	 */
-	public function macroSyntax(MacroNode $node)
-	{
-		if ($node->closing) {
-			$node->args = 'latte';
-		}
-		switch ($node->args) {
-		case '':
-		case 'latte':
-			$this->parser->setDelimiters('\\{(?![\\s\'"{}])', '\\}'); // {...}
-			break;
-
-		case 'double':
-			$this->parser->setDelimiters('\\{\\{(?![\\s\'"{}])', '\\}\\}'); // {{...}}
-			break;
-
-		case 'asp':
-			$this->parser->setDelimiters('<%\s*', '\s*%>'); /* <%...%> */
-			break;
-
-		case 'python':
-			$this->parser->setDelimiters('\\{[{%]\s*', '\s*[%}]\\}'); // {% ... %} | {{ ... }}
-			break;
-
-		case 'off':
-			$this->parser->setDelimiters('[^\x00-\xFF]', '');
-			break;
-
-		default:
-			throw new ParseException("Unknown syntax '$node->args'");
-		}
-	}
-
-
-
-	/**
 	 * {include "file" [,] [params]}
 	 */
 	public function macroInclude(MacroNode $node, $writer)
 	{
 		$code = $writer->write('Nette\Latte\Macros\CoreMacros::includeTemplate(%node.word, %node.array? + $template->getParameters(), $_l->templates[%var])',
-			$this->parser->templateId);
+			$this->getCompiler()->getTemplateId());
 
 		if ($node->modifiers) {
 			return $writer->write('echo %modify(%raw->__toString(TRUE))', $code);
@@ -234,7 +198,7 @@ class CoreMacros extends MacroSet
 	 */
 	public function macroUse(MacroNode $node, $writer)
 	{
-		call_user_func(array($node->tokenizer->fetchWord(), 'install'), $this->parser)
+		call_user_func(array($node->tokenizer->fetchWord(), 'install'), $this->getCompiler())
 			->initialize();
 	}
 
@@ -247,7 +211,7 @@ class CoreMacros extends MacroSet
 	{
 		$variable = $node->tokenizer->fetchWord();
 		if (substr($variable, 0, 1) !== '$') {
-			throw new ParseException("Invalid capture block variable '$variable'");
+			throw new CompileException("Invalid capture block variable '$variable'");
 		}
 		$node->data->variable = $variable;
 		return 'ob_start()';
@@ -268,10 +232,16 @@ class CoreMacros extends MacroSet
 	/**
 	 * {foreach ...}
 	 */
-	public function macroForeach(MacroNode $node, $writer)
+	public function macroEndForeach(MacroNode $node, $writer)
 	{
-		return '$iterations = 0; foreach ($iterator = $_l->its[] = new Nette\Iterators\CachingIterator('
-			. preg_replace('#(.*)\s+as\s+#i', '$1) as ', $writer->formatArgs(), 1) . '):';
+		if (preg_match('#\W(\$iterator|include|require|get_defined_vars)\W#', $this->getCompiler()->expandTokens($node->content))) {
+			$node->openingCode = '<?php $iterations = 0; foreach ($iterator = $_l->its[] = new Nette\Iterators\CachingIterator('
+			. preg_replace('#(.*)\s+as\s+#i', '$1) as ', $writer->formatArgs(), 1) . '): ?>';
+			$node->closingCode = '<?php $iterations++; endforeach; array_pop($_l->its); $iterator = end($_l->its) ?>';
+		} else {
+			$node->openingCode = '<?php $iterations = 0; foreach (' . $writer->formatArgs() . '): ?>';
+			$node->closingCode = '<?php $iterations++; endforeach ?>';
+		}
 	}
 
 
@@ -357,7 +327,7 @@ class CoreMacros extends MacroSet
 				$var = TRUE;
 
 			} elseif ($var === NULL && $node->name === 'default' && $token['type'] !== Latte\MacroTokenizer::T_WHITESPACE) {
-				throw new ParseException("Unexpected '$token[value]' in {default $node->args}");
+				throw new CompileException("Unexpected '$token[value]' in {default $node->args}");
 
 			} else {
 				$out .= $writer->canQuote($tokenizer) ? "'$token[value]'" : $token['value'];

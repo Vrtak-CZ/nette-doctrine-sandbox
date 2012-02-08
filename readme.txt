@@ -7,8 +7,12 @@ php www/index.php help
 
 EntityManager
 -------------
-`$context->entityManager`
+`$context->database`
 
 Config
 ------
-Use "section" database in *parameters* ("subsection" *migrations* for configure migrations).
+Use "section" database in *parameters*.
+
+Create user
+------------
+Go to Homepage:reateDefaultUser (/homepage/create-default-user).

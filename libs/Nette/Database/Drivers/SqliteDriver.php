@@ -22,9 +22,6 @@ use Nette;
  */
 class SqliteDriver extends Nette\Object implements Nette\Database\ISupplementalDriver
 {
-	/** @var array */
-	public $supports = array('meta' => FALSE);
-
 	/** @var Nette\Database\Connection */
 	private $connection;
 
@@ -143,6 +140,7 @@ class SqliteDriver extends Nette\Object implements Nette\Database\ISupplementalD
 				'nullable' => $row['notnull'] == '0',
 				'default' => $row['dflt_value'],
 				'autoincrement' => (bool) preg_match($pattern, $meta['sql']),
+				'primary' => $row['pk'] == '1',
 				'vendor' => (array) $row,
 			);
 		}
@@ -175,7 +173,7 @@ class SqliteDriver extends Nette\Object implements Nette\Database\ISupplementalD
 			$primary = FALSE;
 			foreach ($columns as $info) {
 				if ($column == $info['name']) {
-					$primary = $info['vendor']['pk'];
+					$primary = $info['primary'];
 					break;
 				}
 			}
@@ -219,6 +217,16 @@ class SqliteDriver extends Nette\Object implements Nette\Database\ISupplementalD
 			}
 		}
 		return array_values($keys);
+	}
+
+
+
+	/**
+	 * @return bool
+	 */
+	public function isSupported($item)
+	{
+		return FALSE;
 	}
 
 }

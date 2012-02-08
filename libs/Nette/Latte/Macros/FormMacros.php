@@ -14,7 +14,7 @@ namespace Nette\Latte\Macros;
 use Nette,
 	Nette\Latte,
 	Nette\Latte\MacroNode,
-	Nette\Latte\ParseException,
+	Nette\Latte\CompileException,
 	Nette\Utils\Strings;
 
 
@@ -25,20 +25,22 @@ use Nette,
  * - {form name} ... {/form}
  * - {input name}
  * - {label name /} or {label name}... {/label}
+ * - {formContainer name} ... {/formContainer}
  *
  * @author     David Grudl
  */
 class FormMacros extends MacroSet
 {
 
-	public static function install(Latte\Parser $parser)
+	public static function install(Latte\Compiler $compiler)
 	{
-		$me = new static($parser);
+		$me = new static($compiler);
 		$me->addMacro('form',
-			'Nette\Latte\Macros\FormMacros::renderFormBegin($form = $_control[%node.word], %node.array)',
-			'Nette\Latte\Macros\FormMacros::renderFormEnd($form)');
+			'Nette\Latte\Macros\FormMacros::renderFormBegin($form = $_form = $_control[%node.word], %node.array)',
+			'Nette\Latte\Macros\FormMacros::renderFormEnd($_form)');
 		$me->addMacro('label', array($me, 'macroLabel'), '?></label><?php');
-		$me->addMacro('input', 'echo $form[%node.word]->getControl()->addAttributes(%node.array)');
+		$me->addMacro('input', 'echo $_form[%node.word]->getControl()->addAttributes(%node.array)', NULL, array($me, 'macroAttrInput'));
+		$me->addMacro('formContainer', '$_formStack[] = $_form; $formContainer = $_form = $_form[%node.word]', '$_form = array_pop($_formStack)');
 	}
 
 
@@ -51,13 +53,27 @@ class FormMacros extends MacroSet
 	 */
 	public function macroLabel(MacroNode $node, $writer)
 	{
-		$cmd = 'if ($_label = $form[%node.word]->getLabel()) echo $_label->addAttributes(%node.array)';
+		$cmd = 'if ($_label = $_form[%node.word]->getLabel()) echo $_label->addAttributes(%node.array)';
 		if ($node->isEmpty = (substr($node->args, -1) === '/')) {
 			$node->setArgs(substr($node->args, 0, -1));
 			return $writer->write($cmd);
 		} else {
 			return $writer->write($cmd . '->startTag()');
 		}
+	}
+
+
+
+	/**
+	 * n:input
+	 */
+	public function macroAttrInput(MacroNode $node, $writer)
+	{
+		if ($node->htmlNode->attrs) {
+			$reset = array_fill_keys(array_keys($node->htmlNode->attrs), NULL);
+			return $writer->write('echo $_form[%node.word]->getControl()->addAttributes(%var)->attributes()', $reset);
+		}
+		return $writer->write('echo $_form[%node.word]->getControl()->attributes()');
 	}
 
 

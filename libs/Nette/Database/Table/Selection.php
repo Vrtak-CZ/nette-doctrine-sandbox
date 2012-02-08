@@ -18,7 +18,7 @@ use Nette,
 
 /**
  * Filtered table representation.
- * Selector is based on the great library NotORM http://www.notorm.com written by Jakub Vrana.
+ * Selection is based on the great library NotORM http://www.notorm.com written by Jakub Vrana.
  *
  * @author     Jakub Vrana
  *
@@ -27,13 +27,13 @@ use Nette,
 class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Countable
 {
 	/** @var Nette\Database\Connection */
-	public $connection;
+	protected $connection;
 
 	/** @var string table name */
-	public $name;
+	protected $name;
 
 	/** @var string primary key field name */
-	public $primary;
+	protected $primary;
 
 	/** @var array of [primary key => TableRow] readed from database */
 	protected $rows;
@@ -74,10 +74,10 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 	/** @var array of referenced TableSelection */
 	protected $referenced = array();
 
-	/** @var array of [sql => [column => [key => TableRow]]] used by GroupedTableSelection */
+	/** @var array of [sql+parameters => [column => [key => TableRow]]] used by GroupedTableSelection */
 	protected $referencing = array();
 
-	/** @var array of [sql => [key => TableRow]] used by GroupedTableSelection */
+	/** @var array of [conditions => [key => TableRow]] used by GroupedTableSelection */
 	protected $aggregation = array();
 
 	/** @var array of touched columns */
@@ -105,7 +105,7 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 	{
 		$this->name = $table;
 		$this->connection = $connection;
-		$this->primary = $this->getPrimary($table);
+		$this->primary = $connection->getDatabaseReflection()->getPrimary($table);
 		$this->delimitedName = $this->tryDelimite($this->name);
 		$this->delimitedPrimary = $connection->getSupplementalDriver()->delimite($this->primary);
 	}
@@ -126,6 +126,36 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 			$cache->save(array(__CLASS__, $this->name, $this->conditions), $accessed);
 		}
 		$this->rows = NULL;
+	}
+
+
+
+	/**
+	 * @return Nette\Database\Connection
+	 */
+	public function getConnection()
+	{
+		return $this->connection;
+	}
+
+
+
+	/**
+	 * @return string
+	 */
+	public function getName()
+	{
+		return $this->name;
+	}
+
+
+
+	/**
+	 * @return string
+	 */
+	public function getPrimary()
+	{
+		return $this->primary;
 	}
 
 
@@ -191,9 +221,14 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 			return $this;
 		}
 
+		$hash = md5(json_encode(func_get_args()));
+		if (isset($this->conditions[$hash])) {
+			return $this;
+		}
+
 		$this->__destruct();
 
-		$this->conditions[] = $condition;
+		$this->conditions[$hash] = $condition;
 		$condition = $this->removeExtraTables($condition);
 		$condition = $this->tryDelimite($condition);
 
@@ -211,7 +246,7 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 		} elseif ($parameters instanceof Selection) { // where('column', $db->$table())
 			$clone = clone $parameters;
 			if (!$clone->select) {
-				$clone->select = array($this->getPrimary($clone->name));
+				$clone->select = array($clone->primary);
 			}
 			if ($this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'mysql') {
 				$condition .= ' IN (' . $clone->getSql() . ')';
@@ -312,10 +347,12 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 	 */
 	public function aggregation($function)
 	{
-		$selection = clone $this;
+		$selection = new Selection($this->name, $this->connection);
+		$selection->where = $this->where;
+		$selection->parameters = $this->parameters;
+		$selection->conditions = $this->conditions;
+
 		$selection->select($function);
-		$selection->limit = null;
-		$selection->order = array();
 
 		foreach ($selection->fetch() as $val) {
 			return $val;
@@ -409,6 +446,7 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 	protected function createJoins($val, $inner = FALSE)
 	{
 		$driver = $this->connection->getSupplementalDriver();
+		$reflection = $this->connection->getDatabaseReflection();
 		$joins = array();
 		preg_match_all('~\\b([a-z][\\w.:]*[.:])([a-z]\\w*)(\\s+IS\\b|\\s*<=>)?~i', $val, $matches);
 		foreach ($matches[1] as $names) {
@@ -419,11 +457,11 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 					list(, $name, $delimiter) = $match;
 
 					if ($delimiter === ':') {
-						list($table, $primary) = $this->connection->databaseReflection->getHasManyReference($parent, $name);
-						$column = $this->getPrimary($parent);
+						list($table, $primary) = $reflection->getHasManyReference($parent, $name);
+						$column = $reflection->getPrimary($parent);
 					} else {
-						list($table, $column) = $this->connection->databaseReflection->getBelongsToReference($parent, $name);
-						$primary = $this->getPrimary($table);
+						list($table, $column) = $reflection->getBelongsToReference($parent, $name);
+						$primary = $reflection->getPrimary($table);
 					}
 
 					$joins[$name] = ' '
@@ -680,7 +718,7 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 
 			if ($keys) {
 				$referenced = new Selection($table, $this->connection);
-				$referenced->where($table . '.' . $this->getPrimary($table), array_keys($keys));
+				$referenced->where($table . '.' . $referenced->primary, array_keys($keys));
 			} else {
 				$referenced = array();
 			}
@@ -697,18 +735,11 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 	 * @param  string
 	 * @return GroupedSelection
 	 */
-	public function getReferencingTable($table, $column)
+	public function getReferencingTable($table, $column, $active = NULL)
 	{
-		$referencing = new GroupedSelection($table, $this, $column);
+		$referencing = new GroupedSelection($table, $this, $column, $active);
 		$referencing->where("$table.$column", array_keys((array) $this->rows)); // (array) - is NULL after insert
 		return $referencing;
-	}
-
-
-
-	private function getPrimary($table)
-	{
-		return $this->connection->databaseReflection->getPrimary($table);
 	}
 
 

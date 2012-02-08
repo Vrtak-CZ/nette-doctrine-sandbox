@@ -170,8 +170,21 @@ final class Debugger
 					'tab' => 'Template',
 					'panel' => '<p><b>File:</b> ' . Helpers::editorLink($e->sourceFile, $e->sourceLine)
 					. '&nbsp; <b>Line:</b> ' . ($e->sourceLine ? $e->sourceLine : 'n/a') . '</p>'
-					. ($e->sourceLine ? '<pre>' . BlueScreen::highlightFile($e->sourceFile, $e->sourceLine) . '</pre>' : '')
+					. ($e->sourceLine ? BlueScreen::highlightFile($e->sourceFile, $e->sourceLine) : '')
 				);
+			} elseif ($e instanceof Nette\Utils\NeonException && preg_match('#line (\d+)#', $e->getMessage(), $m)) {
+				if ($item = Helpers::findTrace($e->getTrace(), 'Nette\Config\Adapters\NeonAdapter::load')) {
+					return array(
+						'tab' => 'NEON',
+						'panel' => '<p><b>File:</b> ' . Helpers::editorLink($item['args'][0], $m[1]) . '&nbsp; <b>Line:</b> ' . $m[1] . '</p>'
+							. BlueScreen::highlightFile($item['args'][0], $m[1])
+					);
+				} elseif ($item = Helpers::findTrace($e->getTrace(), 'Nette\Utils\Neon::decode')) {
+					return array(
+						'tab' => 'NEON',
+						'panel' => BlueScreen::highlightPhp($item['args'][0], $m[1])
+					);
+				}
 			}
 		});
 
@@ -316,7 +329,7 @@ final class Debugger
 			$exceptionFilename = self::$logDirectory . '/' . $exceptionFilename;
 			if (empty($saved) && $logHandle = @fopen($exceptionFilename, 'w')) {
 				ob_start(); // double buffer prevents sending HTTP headers in some PHP
-				ob_start(function($buffer) use ($logHandle) { fwrite($logHandle, $buffer); }, 1);
+				ob_start(function($buffer) use ($logHandle) { fwrite($logHandle, $buffer); }, 4096);
 				self::$blueScreen->render($exception);
 				ob_end_flush();
 				ob_end_clean();
@@ -368,7 +381,8 @@ final class Debugger
 	public static function _exceptionHandler(\Exception $exception)
 	{
 		if (!headers_sent()) { // for PHP < 5.2.4
-			header('HTTP/1.1 500 Internal Server Error');
+			$protocol = isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.1';
+			header($protocol . ' 500', TRUE, 500);
 		}
 
 		try {
@@ -559,7 +573,7 @@ final class Debugger
 
 		if (!$return) {
 			$trace = debug_backtrace();
-			$i = !isset($trace[1]['class']) && isset($trace[1]['function']) && $trace[1]['function'] === 'dump' ? 1 : 0;
+			$i = Helpers::findTrace($trace, 'dump') ? 1 : 0;
 			if (isset($trace[$i]['file'], $trace[$i]['line']) && is_file($trace[$i]['file'])) {
 				$lines = file($trace[$i]['file']);
 				preg_match('#dump\((.*)\)#', $lines[$trace[$i]['line'] - 1], $m);

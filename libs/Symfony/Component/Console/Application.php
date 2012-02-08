@@ -488,7 +488,7 @@ class Application
             }
 
             if (count($abbrevs[$part]) > 1) {
-                throw new \InvalidArgumentException(sprintf('The namespace "%s" is ambiguous (%s).', $namespace, $this->getAbbreviationSuggestions($abbrevs[$part])));
+                throw new \InvalidArgumentException(sprintf('The namespace "%s" is ambiguous (%s).', $namespace, $this->getAbbreviationSuggestions($abbrevs[$namespace])));
             }
 
             $found[] = $abbrevs[$part][0];
@@ -581,7 +581,7 @@ class Application
 
         $commands = array();
         foreach ($this->commands as $name => $command) {
-            if ($namespace === $this->extractNamespace($name, substr_count($namespace, ':') + 1)) {
+            if ($namespace === $this->extractNamespace($name)) {
                 $commands[$name] = $command;
             }
         }
@@ -718,16 +718,9 @@ class Application
      */
     public function renderException($e, $output)
     {
-        $strlen = function ($string) {
-            if (!function_exists('mb_strlen')) {
-                return strlen($string);
-            }
-
-            if (false === $encoding = mb_detect_encoding($string)) {
-                return strlen($string);
-            }
-
-            return mb_strlen($string, $encoding);
+        $strlen = function ($string)
+        {
+            return function_exists('mb_strlen') ? mb_strlen($string, mb_detect_encoding($string)) : strlen($string);
         };
 
         do {
