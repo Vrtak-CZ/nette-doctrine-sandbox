@@ -7,7 +7,7 @@
  * This source file is subject to the GNU Lesser General Public License. For more information please see http://nella-project.org
  */
 
-namespace Nella\Addons\Doctrine\Config;
+namespace Nella\NetteAddons\Doctrine\Config;
 
 use Nette\Config\Configurator,
 	Nette\DI\ContainerBuilder,
@@ -38,7 +38,6 @@ class Extension extends \Nette\Config\CompilerExtension
 	);
 	/** @var array */
 	public $entityManagerDefaults = array(
-		'class' => 'Doctrine\ORM\EntityManager',
 		'entityDirs' => array('%appDir%'),
 		'proxyDir' => '%appDir%/proxies',
 		'proxyNamespace' => 'App\Model\Proxies',
@@ -57,7 +56,7 @@ class Extension extends \Nette\Config\CompilerExtension
 	{
 		if (!class_exists('Doctrine\ORM\Version')) {
 			throw new \Nette\InvalidStateException('Doctrine ORM does not exists');
-		} elseif (\Doctrine\ORM\Version::compare('2.2.0') < 0) {
+		} elseif (\Doctrine\ORM\Version::compare('2.2.0') > 0) {
 			throw new \Nette\InvalidStateException(
 				'Doctrine version ' . \Doctrine\ORM\Version::VERSION . ' not supported (support only for 2.2+)'
 			);
@@ -100,7 +99,7 @@ class Extension extends \Nette\Config\CompilerExtension
 
 		// metadata driver factory
 		$metadataDriverFactory = $builder->addDefinition($this->prefix('metadataDriver'))
-			->setClass('Nella\Doctrine\Mapping\Driver\AnnotationDriver', array('%annotationReader%','%entityDirs%'))
+			->setClass('Nella\NetteAddons\Doctrine\Mapping\Driver\AnnotationDriver', array('%annotationReader%','%entityDirs%'))
 			->setParameters(array('annotationReader','entityDirs'));
 
 		// entity manager factory

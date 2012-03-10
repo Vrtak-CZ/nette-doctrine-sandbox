@@ -24,8 +24,8 @@ $configurator->createRobotLoader()
 	->addDirectory(LIBS_DIR)
 	->register();
 
-\Nella\Addons\Doctrine\Config\Extension::register($configurator);
-\Nella\Addons\Doctrine\Config\MigrationsExtension::register($configurator);
+\Nella\NetteAddons\Doctrine\Config\Extension::register($configurator);
+\Nella\NetteAddons\Doctrine\Config\MigrationsExtension::register($configurator);
 	
 // Create Dependency Injection container from config.neon file
 $configurator->addConfig(__DIR__ . '/config/config.neon');

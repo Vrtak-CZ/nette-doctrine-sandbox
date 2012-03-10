@@ -7,7 +7,7 @@
  * This source file is subject to the GNU Lesser General Public License. For more information please see http://nella-project.org
  */
 
-namespace Nella\Addons\Doctrine\Diagnostics;
+namespace Nella\NetteAddons\Doctrine\Diagnostics;
 
 use Nette\Diagnostics\Debugger;
 

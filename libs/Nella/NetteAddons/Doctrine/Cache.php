@@ -7,7 +7,7 @@
  * This source file is subject to the GNU Lesser General Public License. For more information please see http://nella-project.org
  */
 
-namespace Nella\Addons\Doctrine;
+namespace Nella\NetteAddons\Doctrine;
 
 use Nette\Caching\Cache as NCache;
 
@@ -18,6 +18,8 @@ use Nette\Caching\Cache as NCache;
  */
 class Cache extends \Doctrine\Common\Cache\CacheProvider
 {
+	const CACHE_TAG = 'doctrine',
+		CACHE_NAMESPACE = 'Nella.Doctrine';
 	/** @var \Nette\Caching\Cache */
 	private $storage = array();
 
@@ -25,7 +27,7 @@ class Cache extends \Doctrine\Common\Cache\CacheProvider
 	 * @param \Nette\Caching\IStorage
 	 * @param string
 	 */
-	public function  __construct(\Nette\Caching\IStorage $cacheStorage, $name = "Nella.Doctrine")
+	public function  __construct(\Nette\Caching\IStorage $cacheStorage, $name = self::CACHE_NAMESPACE)
 	{
 		$this->storage = new NCache($cacheStorage, $name);
 	}
@@ -75,12 +77,12 @@ class Cache extends \Doctrine\Common\Cache\CacheProvider
 		if ($lifeTime != 0) {
 			$this->storage->save($id, $data, array(
 				NCache::EXPIRE => time() + $lifeTime,
-				NCache::TAGS => array("doctrine"),
+				NCache::TAGS => array(static::CACHE_TAG),
 				NCache::FILES => $files,
 			));
 		} else {
 			$this->storage->save($id, $data, array(
-				NCache::TAGS => array("doctrine"),
+				NCache::TAGS => array(static::CACHE_TAG),
 				NCache::FILES => $files,
 			));
 		}
