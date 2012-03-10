@@ -243,6 +243,10 @@ class Container extends Nette\FreezableObject implements IContainer
 
 
 
+	/********************* autowiring ****************d*g**/
+
+
+
 	/**
 	 * Creates new instance using autowiring.
 	 * @param  string  class
@@ -361,7 +365,7 @@ class Container extends Nette\FreezableObject implements IContainer
 	public static function getMethodName($name, $isService = TRUE)
 	{
 		$uname = ucfirst($name);
-		return ($isService ? 'createService' : 'create') . ($name === $uname ? '_' : '') . strtr($uname, '.', '_');
+		return ($isService ? 'createService' : 'create') . ($name === $uname ? '__' : '') . str_replace('.', '__', $uname);
 	}
 
 }

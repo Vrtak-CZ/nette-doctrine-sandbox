@@ -85,7 +85,7 @@ class Application
             new InputOption('--help',           '-h', InputOption::VALUE_NONE, 'Display this help message.'),
             new InputOption('--quiet',          '-q', InputOption::VALUE_NONE, 'Do not output any message.'),
             new InputOption('--verbose',        '-v', InputOption::VALUE_NONE, 'Increase verbosity of messages.'),
-            new InputOption('--version',        '-V', InputOption::VALUE_NONE, 'Display this program version.'),
+            new InputOption('--version',        '-V', InputOption::VALUE_NONE, 'Display this application version.'),
             new InputOption('--ansi',           '',   InputOption::VALUE_NONE, 'Force ANSI output.'),
             new InputOption('--no-ansi',        '',   InputOption::VALUE_NONE, 'Disable ANSI output.'),
             new InputOption('--no-interaction', '-n', InputOption::VALUE_NONE, 'Do not ask any interactive question.'),
@@ -488,7 +488,7 @@ class Application
             }
 
             if (count($abbrevs[$part]) > 1) {
-                throw new \InvalidArgumentException(sprintf('The namespace "%s" is ambiguous (%s).', $namespace, $this->getAbbreviationSuggestions($abbrevs[$namespace])));
+                throw new \InvalidArgumentException(sprintf('The namespace "%s" is ambiguous (%s).', $namespace, $this->getAbbreviationSuggestions($abbrevs[$part])));
             }
 
             $found[] = $abbrevs[$part][0];
@@ -581,7 +581,7 @@ class Application
 
         $commands = array();
         foreach ($this->commands as $name => $command) {
-            if ($namespace === $this->extractNamespace($name)) {
+            if ($namespace === $this->extractNamespace($name, substr_count($namespace, ':') + 1)) {
                 $commands[$name] = $command;
             }
         }
@@ -653,7 +653,7 @@ class Application
             }
         }
 
-        return implode("\n", $messages);
+        return implode(PHP_EOL, $messages);
     }
 
     /**
@@ -718,9 +718,16 @@ class Application
      */
     public function renderException($e, $output)
     {
-        $strlen = function ($string)
-        {
-            return function_exists('mb_strlen') ? mb_strlen($string, mb_detect_encoding($string)) : strlen($string);
+        $strlen = function ($string) {
+            if (!function_exists('mb_strlen')) {
+                return strlen($string);
+            }
+
+            if (false === $encoding = mb_detect_encoding($string)) {
+                return strlen($string);
+            }
+
+            return mb_strlen($string, $encoding);
         };
 
         do {
@@ -774,7 +781,8 @@ class Application
 
         if (null !== $this->runningCommand) {
             $output->writeln(sprintf('<info>%s</info>', sprintf($this->runningCommand->getSynopsis(), $this->getName())));
-            $output->writeln("\n");
+            $output->writeln("");
+            $output->writeln("");
         }
     }
 
@@ -829,6 +837,14 @@ class Application
         return sprintf('%s, %s%s', $abbrevs[0], $abbrevs[1], count($abbrevs) > 2 ? sprintf(' and %d more', count($abbrevs) - 2) : '');
     }
 
+    /**
+     * Returns the namespace part of the command name.
+     *
+     * @param string $name  The full name of the command
+     * @param string $limit The maximum number of parts of the namespace
+     *
+     * @return string The namespace of the command
+     */
     private function extractNamespace($name, $limit = null)
     {
         $parts = explode(':', $name);

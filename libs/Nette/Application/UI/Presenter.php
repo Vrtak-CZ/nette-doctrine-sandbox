@@ -29,7 +29,7 @@ use Nette,
  * @property-read string $action
  * @property      string $view
  * @property      string $layout
- * @property-read stdClass $payload
+ * @property-read \stdClass $payload
  * @property-read bool $ajax
  * @property-read Nette\Application\Request $lastCreatedRequest
  * @property-read Nette\Http\SessionSection $flashSession
@@ -87,7 +87,7 @@ abstract class Presenter extends Control implements Application\IPresenter
 	/** @var string */
 	private $layout;
 
-	/** @var stdClass */
+	/** @var \stdClass */
 	private $payload;
 
 	/** @var string */
@@ -573,7 +573,7 @@ abstract class Presenter extends Control implements Application\IPresenter
 
 
 	/**
-	 * @return stdClass
+	 * @return \stdClass
 	 */
 	final public function getPayload()
 	{
@@ -1273,11 +1273,13 @@ abstract class Presenter extends Control implements Application\IPresenter
 		}
 
 		foreach ($params as $key => $value) {
-			$a = strlen($key) > 2 ? strrpos($key, self::NAME_SEPARATOR, -2) : FALSE;
-			if (!$a) {
+			if (!preg_match('#^((?:[a-z0-9_]+-)*)((?!\d+$)[a-z0-9_]+)$#i', $key, $matches)) {
+				$this->error("'Invalid parameter name '$key'");
+			}
+			if (!$matches[1]) {
 				$selfParams[$key] = $value;
 			} else {
-				$this->globalParams[substr($key, 0, $a)][substr($key, $a + 1)] = $value;
+				$this->globalParams[substr($matches[1], 0, -1)][$matches[2]] = $value;
 			}
 		}
 

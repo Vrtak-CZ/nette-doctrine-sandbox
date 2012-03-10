@@ -217,7 +217,7 @@ final class Debugger
 			self::$productionMode = $mode;
 
 		} elseif ($mode !== self::DETECT || self::$productionMode === NULL) { // IP addresses or computer names whitelist detection
-			$mode = is_string($mode) ? preg_split('#[,\s]+#', $mode) : array($mode);
+			$mode = is_string($mode) ? preg_split('#[,\s]+#', $mode) : (array) $mode;
 			$mode[] = '127.0.0.1';
 			$mode[] = '::1';
 			self::$productionMode = !in_array(isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : php_uname('n'), $mode, TRUE);
@@ -572,7 +572,7 @@ final class Debugger
 		$output = "<pre class=\"nette-dump\">" . Helpers::htmlDump($var) . "</pre>\n";
 
 		if (!$return) {
-			$trace = debug_backtrace();
+			$trace = debug_backtrace(FALSE);
 			$i = Helpers::findTrace($trace, 'dump') ? 1 : 0;
 			if (isset($trace[$i]['file'], $trace[$i]['line']) && is_file($trace[$i]['file'])) {
 				$lines = file($trace[$i]['file']);

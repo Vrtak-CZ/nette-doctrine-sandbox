@@ -187,7 +187,7 @@ class Parser extends Nette\Object
 			$this->addToken(Token::TAG_END, $matches[0]);
 			$this->setContext(!$this->xmlMode && in_array($this->lastTag, array('script', 'style')) ? self::CONTEXT_CDATA : self::CONTEXT_TEXT);
 
-		} elseif (!empty($matches['attr'])) { // HTML attribute
+		} elseif (isset($matches['attr']) && $matches['attr'] !== '') { // HTML attribute
 			$token = $this->addToken(Token::ATTRIBUTE, $matches[0]);
 			$token->name = $matches['attr'];
 			$token->value = isset($matches['value']) ? $matches['value'] : '';
@@ -341,9 +341,9 @@ class Parser extends Nette\Object
 		$match = Strings::match($macro, '~^
 			(
 				(?P<name>\?|/?[a-z]\w*+(?:[.:]\w+)*+(?!::|\())|   ## ?, name, /name, but not function( or class::
-				(?P<noescape>!?)(?P<shortname>/?[=\~#%^&_]?)      ## [!] [=] expression to print
+				(?P<noescape>!?)(?P<shortname>/?[=\~#%^&_]?)      ## !expression, !=expression, ...
 			)(?P<args>.*?)
-			(?P<modifiers>\|[a-z](?:'.Parser::RE_STRING.'|[^\'"]+)*)?
+			(?P<modifiers>\|[a-z](?:'.Parser::RE_STRING.'|[^\'"])*)?
 		()$~isx');
 
 		if (!$match) {

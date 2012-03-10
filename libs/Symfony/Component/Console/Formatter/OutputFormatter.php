@@ -20,6 +20,11 @@ namespace Symfony\Component\Console\Formatter;
  */
 class OutputFormatter implements OutputFormatterInterface
 {
+    /**
+     * The pattern to phrase the format.
+     */
+    const FORMAT_PATTERN = '#<([a-z][a-z0-9_=;-]+)>(.*?)</\\1?>#is';
+
     private $decorated;
     private $styles = array();
 
@@ -27,7 +32,7 @@ class OutputFormatter implements OutputFormatterInterface
      * Initializes console output formatter.
      *
      * @param   Boolean $decorated  Whether this formatter should actually decorate strings
-     * @param   array   $styles     Array of "name => FormatterStyle" instance
+     * @param   array   $styles     Array of "name => FormatterStyle" instances
      *
      * @api
      */
@@ -48,7 +53,7 @@ class OutputFormatter implements OutputFormatterInterface
     /**
      * Sets the decorated flag.
      *
-     * @param Boolean $decorated Whether to decorated the messages or not
+     * @param Boolean $decorated Whether to decorate the messages or not
      *
      * @api
      */
@@ -103,12 +108,14 @@ class OutputFormatter implements OutputFormatterInterface
      *
      * @return  OutputFormatterStyleInterface
      *
+     * @throws  \InvalidArgumentException When style isn't defined
+     *
      * @api
      */
     public function getStyle($name)
     {
         if (!$this->hasStyle($name)) {
-            throw new \InvalidArgumentException('Undefined style: ' . $name);
+            throw new \InvalidArgumentException('Undefined style: '.$name);
         }
 
         return $this->styles[strtolower($name)];
@@ -125,7 +132,7 @@ class OutputFormatter implements OutputFormatterInterface
      */
     public function format($message)
     {
-        return preg_replace_callback('#<([a-z][a-z0-9_=;-]+)>(.*?)</\\1?>#i', array($this, 'replaceStyle'), $message);
+        return preg_replace_callback(self::FORMAT_PATTERN, array($this, 'replaceStyle'), $message);
     }
 
     /**
