@@ -27,23 +27,19 @@ common:
 			autoStart: smart
 
 	doctrine:
-		connections:
-			default: %database%
-
 		entityManagers:
 			default:
-				connection: default
-				
-		console:
-			entityManager: default
-			
+				connection: %database%
+
+				console: true
+
 	migrations:
 		connection: @doctrine.connections.default
 
 
 	services:
 		console: @doctrine.console
-	
+
 		database: @doctrine.entityManagers.default
 
 		authenticator: Authenticator( @database::getRepository('User') )
@@ -53,7 +49,7 @@ common:
 
 
 production < common:
-	
+
 
 development < common:
 	parameters:
