@@ -30,10 +30,10 @@ use Nette;
  */
 class User extends Nette\Object
 {
-	 /** @deprecated */
+	/**/ /** @deprecated */
 	const MANUAL = IUserStorage::MANUAL,
 		INACTIVITY = IUserStorage::INACTIVITY,
-		BROWSER_CLOSED = IUserStorage::BROWSER_CLOSED;
+		BROWSER_CLOSED = IUserStorage::BROWSER_CLOSED;/**/
 
 	/** @var string  default role for unauthenticated user */
 	public $guestRole = 'guest';
@@ -56,12 +56,12 @@ class User extends Nette\Object
 	/** @var IAuthorizator */
 	private $authorizator;
 
-	/** @var Nette\DI\IContainer */
+	/** @var Nette\DI\Container */
 	private $context;
 
 
 
-	public function __construct(IUserStorage $storage, Nette\DI\IContainer $context)
+	public function __construct(IUserStorage $storage, Nette\DI\Container $context)
 	{
 		$this->storage = $storage;
 		$this->context = $context; // with IAuthenticator, IAuthorizator
@@ -111,12 +111,12 @@ class User extends Nette\Object
 	 */
 	final public function logout($clearIdentity = FALSE)
 	{
+		if ($this->isLoggedIn()) {
+			$this->onLoggedOut($this);
+			$this->storage->setAuthenticated(FALSE);
+		}
 		if ($clearIdentity) {
 			$this->storage->setIdentity(NULL);
-		}
-		if ($this->isLoggedIn()) {
-			$this->storage->setAuthenticated(FALSE);
-			$this->onLoggedOut($this);
 		}
 	}
 

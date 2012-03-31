@@ -150,7 +150,7 @@ class Template extends Nette\Object implements ITemplate
 		$code = $this->getSource();
 		foreach ($this->filters as $filter) {
 			$code = self::extractPhp($code, $blocks);
-			$code = $filter($code);
+			$code = $filter/*5.2*->invoke*/($code);
 			$code = strtr($code, $blocks); // put PHP code back
 		}
 
@@ -165,7 +165,7 @@ class Template extends Nette\Object implements ITemplate
 
 	/**
 	 * Registers callback as template compile-time filter.
-	 * @param  callback
+	 * @param  callable
 	 * @return Template  provides a fluent interface
 	 */
 	public function registerFilter($callback)
@@ -194,7 +194,7 @@ class Template extends Nette\Object implements ITemplate
 	/**
 	 * Registers callback as template run-time helper.
 	 * @param  string
-	 * @param  callback
+	 * @param  callable
 	 * @return Template  provides a fluent interface
 	 */
 	public function registerHelper($name, $callback)
@@ -207,7 +207,7 @@ class Template extends Nette\Object implements ITemplate
 
 	/**
 	 * Registers callback as template run-time helpers loader.
-	 * @param  callback
+	 * @param  callable
 	 * @return Template  provides a fluent interface
 	 */
 	public function registerHelperLoader($callback)
@@ -240,7 +240,7 @@ class Template extends Nette\Object implements ITemplate
 		$lname = strtolower($name);
 		if (!isset($this->helpers[$lname])) {
 			foreach ($this->helperLoaders as $loader) {
-				$helper = $loader($lname);
+				$helper = $loader/*5.2*->invoke*/($lname);
 				if ($helper) {
 					$this->registerHelper($lname, $helper);
 					return $this->helpers[$lname]->invokeArgs($args);
@@ -432,8 +432,12 @@ class Template extends Nette\Object implements ITemplate
 		$tokens = token_get_all($source);
 		foreach ($tokens as $n => $token) {
 			if (is_array($token)) {
-				if ($token[0] === T_INLINE_HTML || $token[0] === T_CLOSE_TAG) {
+				if ($token[0] === T_INLINE_HTML) {
 					$res .= $token[1];
+					continue;
+
+				} elseif ($token[0] === T_CLOSE_TAG) {
+					$res .= str_repeat("\n", substr_count($php, "\n")) . $token[1];
 					continue;
 
 				} elseif ($token[0] === T_OPEN_TAG && $token[1] === '<?' && isset($tokens[$n+1][1]) && $tokens[$n+1][1] === 'xml') {

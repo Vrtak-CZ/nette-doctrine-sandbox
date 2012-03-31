@@ -104,7 +104,7 @@ class Form extends Container
 	/** @var Nette\Localization\ITranslator */
 	private $translator;
 
-	/** @var array of ControlGroup */
+	/** @var ControlGroup[] */
 	private $groups = array();
 
 	/** @var array */
@@ -287,7 +287,7 @@ class Form extends Container
 
 	/**
 	 * Returns all defined groups.
-	 * @return array of FormGroup
+	 * @return FormGroup[]
 	 */
 	public function getGroups()
 	{
@@ -481,7 +481,7 @@ class Form extends Container
 
 	/**
 	 * Returns the values submitted by the form.
-	 * @return array
+	 * @return Nette\ArrayHash|array
 	 */
 	public function getValues($asArray = FALSE)
 	{

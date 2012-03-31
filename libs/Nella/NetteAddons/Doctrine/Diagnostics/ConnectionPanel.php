@@ -1,10 +1,10 @@
 <?php
 /**
- * This file is part of the Nella Framework.
+ * This file is part of the Nella Framework (http://nellafw.org).
  *
- * Copyright (c) 2006, 2011 Patrik Votoček (http://patrik.votocek.cz)
+ * Copyright (c) 2006, 2012 Patrik Votoček (http://patrik.votocek.cz)
  *
- * This source file is subject to the GNU Lesser General Public License. For more information please see http://nella-project.org
+ * For the full copyright and license information, please view the file LICENSE.txt that was distributed with this source code.
  */
 
 namespace Nella\NetteAddons\Doctrine\Diagnostics;
@@ -33,7 +33,7 @@ class ConnectionPanel extends \Nette\Object implements \Nette\Diagnostics\IBarPa
 	public function startQuery($sql, array $params = NULL, array $types = NULL)
 	{
 		Debugger::timer('doctrine');
-		
+
 		$this->queries[] = array($sql, $params, 0);
 	}
 
@@ -66,7 +66,7 @@ class ConnectionPanel extends \Nette\Object implements \Nette\Diagnostics\IBarPa
 		$s .= '<tr><td>' . sprintf('%0.3f', $time * 1000);
 		$s .= '</td><td class="nette-Doctrine2Panel-sql">' . \Nette\Database\Helpers::dumpSql($sql);
 		$s .= '</td><td>' . \Nette\Diagnostics\Helpers::clickableDump($params, TRUE) . '</tr>';
-		
+
 		return $s;
 	}
 

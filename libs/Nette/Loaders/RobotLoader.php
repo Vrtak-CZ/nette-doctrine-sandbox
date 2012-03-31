@@ -210,7 +210,10 @@ class RobotLoader extends AutoLoader
 				return $this->addClass($class, $file, $time);
 			}
 			$e = new Nette\InvalidStateException("Ambiguous class '$class' resolution; defined in $file and in " . $this->list[$lClass][0] . ".");
-			{
+			/*5.2*if (PHP_VERSION_ID < 50300) {
+				Nette\Diagnostics\Debugger::_exceptionHandler($e);
+				exit;
+			} else*/ {
 				throw $e;
 			}
 		}

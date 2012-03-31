@@ -62,9 +62,9 @@ abstract class Object
 	 * Access to reflection.
 	 * @return Nette\Reflection\ClassType
 	 */
-	public static function getReflection()
+	public /**/static/**/ function getReflection()
 	{
-		return new Reflection\ClassType(get_called_class());
+		return new Reflection\ClassType(/*5.2*$this*//**/get_called_class()/**/);
 	}
 
 
@@ -100,7 +100,7 @@ abstract class Object
 	/**
 	 * Adding method to class.
 	 * @param  string  method name
-	 * @param  mixed   callback or closure
+	 * @param  callable
 	 * @return mixed
 	 */
 	public static function extensionMethod($name, $callback = NULL)

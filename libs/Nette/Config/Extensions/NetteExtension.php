@@ -28,7 +28,7 @@ class NetteExtension extends Nette\Config\CompilerExtension
 		'xhtml' => TRUE,
 		'session' => array(
 			'iAmUsingBadHost' => NULL,
-			'autoStart' => NULL,  // true|false|smart
+			'autoStart' => 'smart',  // true|false|smart
 			'expiration' => NULL,
 		),
 		'application' => array(
@@ -42,7 +42,7 @@ class NetteExtension extends Nette\Config\CompilerExtension
 		),
 		'security' => array(
 			'debugger' => TRUE,
-			'frames' => 'DENY', // X-Frame-Options
+			'frames' => 'SAMEORIGIN', // X-Frame-Options
 			'users' => array(), // of [user => password]
 			'roles' => array(), // of [role => parents]
 			'resources' => array(), // of [resource => parents]
@@ -286,7 +286,7 @@ class NetteExtension extends Nette\Config\CompilerExtension
 		$config = $this->getConfig($this->defaults);
 
 		// debugger
-		foreach (array('email', 'editor', 'browser', 'strictMode') as $key) {
+		foreach (array('email', 'editor', 'browser', 'strictMode', 'maxLen', 'maxDepth') as $key) {
 			if (isset($config['debugger'][$key])) {
 				$initialize->addBody('Nette\Diagnostics\Debugger::$? = ?;', array($key, $config['debugger'][$key]));
 			}
@@ -330,8 +330,14 @@ class NetteExtension extends Nette\Config\CompilerExtension
 			$initialize->addBody('Nette\Utils\Html::$xhtml = ?;', array((bool) $config['xhtml']));
 		}
 
-		if (isset($config['security']['frames'])) {
-			$initialize->addBody('header(?);', array('X-Frame-Options: ' . $config['security']['frames']));
+		if (isset($config['security']['frames']) && $config['security']['frames'] !== TRUE) {
+			$frames = $config['security']['frames'];
+			if ($frames === FALSE) {
+				$frames = 'DENY';
+			} elseif (preg_match('#^https?:#', $frames)) {
+				$frames = "ALLOW-FROM $frames";
+			}
+			$initialize->addBody('header(?);', array("X-Frame-Options: $frames"));
 		}
 
 		foreach ($container->findByTag('run') as $name => $on) {

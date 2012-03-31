@@ -21,6 +21,7 @@ use Nette,
  * Selection is based on the great library NotORM http://www.notorm.com written by Jakub Vrana.
  *
  * @author     Jakub Vrana
+ * @author     Jan Skrasek
  *
  * @property-read string $sql
  */
@@ -35,10 +36,10 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 	/** @var string primary key field name */
 	protected $primary;
 
-	/** @var array of [primary key => TableRow] read from database */
+	/** @var ActiveRow[] data read from database in [primary key => ActiveRow] format */
 	protected $rows;
 
-	/** @var array of [primary key => TableRow] modifiable */
+	/** @var ActiveRow[] modifiable data in [primary key => ActiveRow] format */
 	protected $data;
 
 	/** @var array of column to select */
@@ -71,14 +72,11 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 	/** @var bool recheck referencing keys */
 	protected $checkReferenceNewKeys = FALSE;
 
-	/** @var array of referenced TableSelection */
+	/** @var Selection[] */
 	protected $referenced = array();
 
-	/** @var array of [sql+parameters => [column => [key => TableRow]]] used by GroupedTableSelection */
+	/** @var GroupedSelection[] */
 	protected $referencing = array();
-
-	/** @var array of [conditions => [key => TableRow]] used by GroupedTableSelection */
-	protected $aggregation = array();
 
 	/** @var array of touched columns */
 	protected $accessed;
@@ -97,10 +95,6 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 
 
 
-	/**
-	 * @param  string
-	 * @param
-	 */
 	public function __construct($table, Nette\Database\Connection $connection)
 	{
 		$this->name = $table;
@@ -603,7 +597,7 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 
 		if ($cache && !$this->select && $this->prevAccessed && ($key === NULL || !isset($this->prevAccessed[$key]))) {
 			$this->prevAccessed = '';
-			$this->rows = NULL;
+			$this->__destruct();
 			return TRUE;
 		}
 		return FALSE;
@@ -697,11 +691,11 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 	 * @param  string
 	 * @param  string
 	 * @param  bool  checks if rows contains the same primary value relations
-	 * @return ActiveRow or NULL if the row does not exist
+	 * @return Selection or array() if the row does not exist
 	 */
 	public function getReferencedTable($table, $column, $checkReferenceNewKeys = FALSE)
 	{
-		$referenced = & $this->referenced[$table][$column];
+		$referenced = & $this->referenced["$table.$column"];
 		if ($referenced === NULL || $checkReferenceNewKeys || $this->checkReferenceNewKeys) {
 			$keys = array();
 			foreach ($this->rows as $row) {
@@ -734,13 +728,19 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 	 * Returns referencing rows.
 	 * @param  string
 	 * @param  string
+	 * @param  int  primary key
+	 * @param  bool force new instance
 	 * @return GroupedSelection
 	 */
-	public function getReferencingTable($table, $column, $active = NULL)
+	public function getReferencingTable($table, $column, $active = NULL, $forceNewInstance = FALSE)
 	{
-		$referencing = new GroupedSelection($table, $this, $column, $active);
-		$referencing->where("$table.$column", array_keys((array) $this->rows)); // (array) - is NULL after insert
-		return $referencing;
+		$referencing = & $this->referencing["$table:$column"];
+		if (!$referencing || $forceNewInstance) {
+			$referencing = new GroupedSelection($table, $this, $column);
+			$referencing->where("$table.$column", array_keys((array) $this->rows)); // (array) - is NULL after insert
+		}
+
+		return $referencing->setActive($active);
 	}
 
 
@@ -872,7 +872,7 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 		$return = array();
 		// no $clone->select = array($key, $value) to allow efficient caching with repetitive calls with different parameters
 		foreach ($this as $row) {
-			$return[$row[$key]] = ($value !== '' ? $row[$value] : $row);
+			$return[is_object($row[$key]) ? (string) $row[$key] : $row[$key]] = ($value !== '' ? $row[$value] : $row);
 		}
 		return $return;
 	}

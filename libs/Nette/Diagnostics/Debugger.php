@@ -74,7 +74,7 @@ final class Debugger
 	/** @var bool disables the @ (shut-up) operator so that notices and warnings are no longer hidden */
 	public static $scream = FALSE;
 
-	/** @var array of callbacks specifies the functions that are automatically called after fatal error */
+	/** @var array of callables specifies the functions that are automatically called after fatal error */
 	public static $onFatalError = array();
 
 	/** @var bool {@link Debugger::enable()} */
@@ -307,7 +307,7 @@ final class Debugger
 				: get_class($exception) . ": " . $exception->getMessage())
 				. " in " . $exception->getFile() . ":" . $exception->getLine();
 
-			$hash = md5($exception );
+			$hash = md5($exception /*5.2*. (method_exists($exception, 'getPrevious') ? $exception->getPrevious() : (isset($exception->previous) ? $exception->previous : ''))*/);
 			$exceptionFilename = "exception-" . @date('Y-m-d-H-i-s') . "-$hash.html";
 			foreach (new \DirectoryIterator(self::$logDirectory) as $entry) {
 				if (strpos($entry, $hash)) {
@@ -320,7 +320,7 @@ final class Debugger
 
 		self::$logger->log(array(
 			@date('[Y-m-d H-i-s]'),
-			$message,
+			trim($message),
 			self::$source ? ' @  ' . self::$source : NULL,
 			!empty($exceptionFilename) ? ' @@  ' . $exceptionFilename : NULL
 		), $priority);
@@ -572,7 +572,7 @@ final class Debugger
 		$output = "<pre class=\"nette-dump\">" . Helpers::htmlDump($var) . "</pre>\n";
 
 		if (!$return) {
-			$trace = debug_backtrace(FALSE);
+			$trace = /*5.2*PHP_VERSION_ID < 50205 ? debug_backtrace() : */debug_backtrace(FALSE);
 			$i = Helpers::findTrace($trace, 'dump') ? 1 : 0;
 			if (isset($trace[$i]['file'], $trace[$i]['line']) && is_file($trace[$i]['file'])) {
 				$lines = file($trace[$i]['file']);

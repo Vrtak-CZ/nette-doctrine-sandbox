@@ -73,7 +73,7 @@ class Method extends \ReflectionMethod
 	 */
 	public function toCallback()
 	{
-		return new Nette\Callback(parent::getDeclaringClass()->getName(), $this->getName());
+		return new Nette\Callback(array(parent::getDeclaringClass()->getName(), $this->getName()));
 	}
 
 
@@ -190,9 +190,9 @@ class Method extends \ReflectionMethod
 	/**
 	 * @return ClassType
 	 */
-	public static function getReflection()
+	public /**/static/**/ function getReflection()
 	{
-		return new ClassType(get_called_class());
+		return new ClassType(/*5.2*$this*//**/get_called_class()/**/);
 	}
 
 

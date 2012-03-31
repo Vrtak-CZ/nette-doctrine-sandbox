@@ -20,30 +20,50 @@ use Nette;
  * GroupedSelection is based on the great library NotORM http://www.notorm.com written by Jakub Vrana.
  *
  * @author     Jakub Vrana
+ * @author     Jan Skrasek
  */
 class GroupedSelection extends Selection
 {
 	/** @var Selection referenced table */
-	private $refTable;
+	protected $refTable;
 
 	/** @var string grouping column name */
-	private $column;
+	protected $column;
 
 	/** @var string */
-	private $delimitedColumn;
+	protected $delimitedColumn;
 
-	/** @var mixed */
-	private $active;
+	/** @var int primary key */
+	protected $active;
+
+	/** @var array of referencing cached results */
+	protected $referencing;
+
+	/** @var array of [conditions => [key => ActiveRow]] */
+	protected $aggregation = array();
 
 
 
-	public function __construct($name, Selection $refTable, $column, $active = NULL)
+	public function __construct($name, Selection $refTable, $column)
 	{
 		parent::__construct($name, $refTable->connection);
 		$this->refTable = $refTable;
 		$this->column = $column;
 		$this->delimitedColumn = $this->connection->getSupplementalDriver()->delimite($this->column);
+	}
+
+
+
+	/**
+	 * @internal
+	 * @param  int  $active
+	 * @return GroupedSelection
+	 */
+	public function setActive($active)
+	{
+		$this->rows = NULL;
 		$this->active = $active;
+		return $this;
 	}
 
 
@@ -82,7 +102,7 @@ class GroupedSelection extends Selection
 
 	public function aggregation($function)
 	{
-		$aggregation = & $this->refTable->aggregation[$function . implode('', $this->where) . implode('', $this->conditions)];
+		$aggregation = & $this->aggregation[$function . implode('', $this->where) . implode('', $this->conditions)];
 		if ($aggregation === NULL) {
 			$aggregation = array();
 
@@ -171,7 +191,7 @@ class GroupedSelection extends Selection
 		}
 
 		$hash = md5($this->getSql() . json_encode($this->parameters));
-		$referencing = & $this->refTable->referencing[$hash];
+		$referencing = & $this->referencing[$hash];
 		if ($referencing === NULL) {
 			$limit = $this->limit;
 			$rows = count($this->refTable->rows);
@@ -199,11 +219,6 @@ class GroupedSelection extends Selection
 		if ($this->data === NULL) {
 			$this->data = array();
 		} else {
-			foreach ($this->data as $row) {
-				// update active id in the selection reference in case of requerying for another column
-				// must be updated only the active key, not the Selection reference, because of caching accessed columns
-				$row->getTable()->active = $this->active;
-			}
 			reset($this->data);
 		}
 	}

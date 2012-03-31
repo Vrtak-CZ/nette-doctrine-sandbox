@@ -1,17 +1,17 @@
 <?php
 /**
- * This file is part of the Nella Framework.
+ * This file is part of the Nella Framework (http://nellafw.org).
  *
- * Copyright (c) 2006, 2011 Patrik Votoček (http://patrik.votocek.cz)
+ * Copyright (c) 2006, 2012 Patrik Votoček (http://patrik.votocek.cz)
  *
- * This source file is subject to the GNU Lesser General Public License. For more information please see http://nella-project.org
+ * For the full copyright and license information, please view the file LICENSE.txt that was distributed with this source code.
  */
 
 namespace Nella\NetteAddons\Doctrine\Mapping\Driver;
 
 /**
  * Annotation driver with ignore dirs support
- * 
+ *
  * @author  Patrik Votoček
  * @author	Pavel Kučera
  */
@@ -19,7 +19,7 @@ class AnnotationDriver extends \Doctrine\ORM\Mapping\Driver\AnnotationDriver
 {
 	/** @var array */
 	private $ignoredDirs = array();
-	
+
 	/**
 	 * @param string
 	 * @return AnnotationDriver

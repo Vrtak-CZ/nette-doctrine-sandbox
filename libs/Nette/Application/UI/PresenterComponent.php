@@ -119,9 +119,9 @@ abstract class PresenterComponent extends Nette\ComponentModel\Container impleme
 	 * Access to reflection.
 	 * @return PresenterComponentReflection
 	 */
-	public static function getReflection()
+	public /**/static/**/ function getReflection()
 	{
-		return new PresenterComponentReflection(get_called_class());
+		return new PresenterComponentReflection(/*5.2*$this*//**/get_called_class()/**/);
 	}
 
 
@@ -268,7 +268,8 @@ abstract class PresenterComponent extends Nette\ComponentModel\Container impleme
 	 */
 	public static function getPersistentParams()
 	{
-		$rc = new Nette\Reflection\ClassType(get_called_class());
+		/*5.2*$arg = func_get_arg(0);*/
+		$rc = new Nette\Reflection\ClassType(/*5.2*$arg*//**/get_called_class()/**/);
 		$params = array();
 		foreach ($rc->getProperties(\ReflectionProperty::IS_PUBLIC) as $rp) {
 			if (!$rp->isStatic() && $rp->hasAnnotation('persistent')) {

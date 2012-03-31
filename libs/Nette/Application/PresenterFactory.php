@@ -31,7 +31,7 @@ class PresenterFactory implements IPresenterFactory
 	/** @var array */
 	private $cache = array();
 
-	/** @var Nette\DI\IContainer */
+	/** @var Nette\DI\Container */
 	private $context;
 
 
@@ -39,7 +39,7 @@ class PresenterFactory implements IPresenterFactory
 	/**
 	 * @param  string
 	 */
-	public function __construct($baseDir, Nette\DI\IContainer $context)
+	public function __construct($baseDir, Nette\DI\Container $context)
 	{
 		$this->baseDir = $baseDir;
 		$this->context = $context;
@@ -129,6 +129,7 @@ class PresenterFactory implements IPresenterFactory
 	 */
 	public function formatPresenterClass($presenter)
 	{
+		/*5.2*return strtr($presenter, ':', '_') . 'Presenter';*/
 		return str_replace(':', 'Module\\', $presenter) . 'Presenter';
 	}
 
@@ -141,6 +142,7 @@ class PresenterFactory implements IPresenterFactory
 	 */
 	public function unformatPresenterClass($class)
 	{
+		/*5.2*return strtr(substr($class, 0, -9), '_', ':');*/
 		return str_replace('Module\\', ':', substr($class, 0, -9));
 	}
 

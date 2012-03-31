@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Nette Framework (version 2.0.1 released on 2012-02-29, http://nette.org)
+ * Nette Framework (version 2.0.2 released on $WCDATE$, http://nette.org)
  *
  * Copyright (c) 2004, 2012 David Grudl (http://davidgrudl.com)
  *
@@ -14,6 +14,17 @@
 /**
  * Check and reset PHP configuration.
  */
+/*5.2*
+if (!defined('PHP_VERSION_ID')) {
+	$tmp = explode('.', PHP_VERSION);
+	define('PHP_VERSION_ID', ($tmp[0] * 10000 + $tmp[1] * 100 + $tmp[2]));
+}
+
+if (PHP_VERSION_ID < 50200) {
+	throw new Exception('Nette Framework requires PHP 5.2.0 or newer.');
+}
+*/
+
 error_reporting(E_ALL | E_STRICT);
 @set_magic_quotes_runtime(FALSE); // @ - deprecated since PHP 5.3.0
 iconv_set_encoding('internal_encoding', 'UTF-8');
@@ -29,7 +40,7 @@ umask(0);
  */
 define('NETTE', TRUE);
 define('NETTE_DIR', __DIR__);
-define('NETTE_VERSION_ID', 20001); // v2.0.1
+define('NETTE_VERSION_ID', 20002); // v2.0.2
 define('NETTE_PACKAGE', '5.3');
 
 
@@ -54,11 +65,14 @@ Nette\Utils\SafeStream::register();
 
 /**
  * Nette\Callback factory.
- * @param  mixed   class, object, function, callback
+ * @param  mixed   class, object, callable
  * @param  string  method
  * @return Nette\Callback
  */
 function callback($callback, $m = NULL)
 {
-	return ($m === NULL && $callback instanceof Nette\Callback) ? $callback : new Nette\Callback($callback, $m);
+	if ($m === NULL) {
+		return $callback instanceof Nette\Callback ? $callback : new Nette\Callback($callback);
+	}
+	return new Nette\Callback(array($callback, $m));
 }
