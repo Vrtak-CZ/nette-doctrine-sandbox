@@ -930,11 +930,9 @@ abstract class Presenter extends Control implements Application\IPresenter
 			$reflection = new PresenterComponentReflection($presenterClass);
 			if ($args || $destination === 'this') {
 				// counterpart of run() & tryCall()
-				/**/$method = $presenterClass::formatActionMethod($action);/**/
-				/*5.2* $method = call_user_func(array($presenterClass, 'formatActionMethod'), $action);*/
+				$method = $presenterClass::formatActionMethod($action);
 				if (!$reflection->hasCallableMethod($method)) {
-					/**/$method = $presenterClass::formatRenderMethod($action);/**/
-					/*5.2* $method = call_user_func(array($presenterClass, 'formatRenderMethod'), $action);*/
+					$method = $presenterClass::formatRenderMethod($action);
 					if (!$reflection->hasCallableMethod($method)) {
 						$method = NULL;
 					}
@@ -1166,8 +1164,7 @@ abstract class Presenter extends Control implements Application\IPresenter
 	 */
 	public static function getPersistentComponents()
 	{
-		/*5.2*$arg = func_get_arg(0);*/
-		return (array) Reflection\ClassType::from(/*5.2*$arg*//**/get_called_class()/**/)
+		return (array) Reflection\ClassType::from(get_called_class())
 			->getAnnotation('persistent');
 	}
 

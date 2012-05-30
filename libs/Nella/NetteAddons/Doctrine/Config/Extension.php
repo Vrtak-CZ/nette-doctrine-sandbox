@@ -219,7 +219,7 @@ class Extension extends \Nette\Config\CompilerExtension
 				'dir' => $config['proxyDir'],
 				'namespace' => $config['proxyNamespace'],
 				'autogenerate' => $config['proxyAutogenerate'] !== NULL ?
-					$config['proxyAutogenerate'] : $builder->parameters['productionMode'],
+					$config['proxyAutogenerate'] : $builder->parameters['debugMode'],
 			);
 
 			$builder->addDefinition($this->configurationsPrefix($name))
@@ -480,6 +480,11 @@ class Extension extends \Nette\Config\CompilerExtension
 		$app = new \Symfony\Component\Console\Application(
 			Framework::NAME . " Command Line Interface", Framework::VERSION
 		);
+		if (class_exists('Nella\Framework')) {
+			$app = new \Symfony\Component\Console\Application(
+				\Nella\Framework::NAME . " Command Line Interface", \Nella\Framework::VERSION
+			);
+		}
 
 		$app->setHelperSet($helperSet);
 		$app->setCatchExceptions(FALSE);

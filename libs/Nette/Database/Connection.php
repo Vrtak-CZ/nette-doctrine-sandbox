@@ -253,9 +253,9 @@ class Connection extends PDO
 	/**
 	 * @return Nette\Reflection\ClassType
 	 */
-	public /**/static/**/ function getReflection()
+	public static function getReflection()
 	{
-		return new Nette\Reflection\ClassType(/*5.2*$this*//**/get_called_class()/**/);
+		return new Nette\Reflection\ClassType(get_called_class());
 	}
 
 

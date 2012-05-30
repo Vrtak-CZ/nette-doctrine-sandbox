@@ -376,6 +376,20 @@ class Configuration
     }
 
     /**
+     * Returns an array of available migration version numbers.
+     *
+     * @return array $availableVersions
+     */
+    public function getAvailableVersions()
+    {
+        $availableVersions = array();
+        foreach ($this->migrations as $migration) {
+            $availableVersions[] = $migration->getVersion();
+        }
+        return $availableVersions;
+    }
+
+    /**
      * Returns the current migrated version from the versions table.
      *
      * @return bool $currentVersion
@@ -384,7 +398,19 @@ class Configuration
     {
         $this->createMigrationTable();
 
-        $sql = "SELECT version FROM " . $this->migrationsTableName . " ORDER BY version DESC";
+        $where = null;
+        if ($this->migrations) {
+            $migratedVersions = array();
+            foreach ($this->migrations as $migration) {
+                $migratedVersions[] = sprintf("'%s'", $migration->getVersion());
+            }
+            $where = " WHERE version IN (" . implode(', ', $migratedVersions) . ")";
+        }
+
+        $sql = sprintf("SELECT version FROM %s%s ORDER BY version DESC",
+            $this->migrationsTableName, $where
+        );
+
         $sql = $this->connection->getDatabasePlatform()->modifyLimitQuery($sql, 1);
         $result = $this->connection->fetchColumn($sql);
         return $result !== false ? (string) $result : '0';

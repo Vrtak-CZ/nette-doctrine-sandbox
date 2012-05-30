@@ -267,14 +267,13 @@ class ContainerBuilder extends Nette\Object
 				$reflection = $factory->toReflection();
 				$def->class = preg_replace('#[|\s].*#', '', $reflection->getAnnotation('return'));
 				if ($def->class && !class_exists($def->class) && $def->class[0] !== '\\' && $reflection instanceof \ReflectionMethod) {
-					/**/$def->class = $reflection->getDeclaringClass()->getNamespaceName() . '\\' . $def->class;/**/
+					$def->class = $reflection->getDeclaringClass()->getNamespaceName() . '\\' . $def->class;
 				}
 			} catch (\ReflectionException $e) {
 			}
 
 		} elseif ($service = $this->getServiceName($factory)) { // alias or factory
 			if (Strings::contains($service, '\\')) { // @\Class
-				/*5.2* $service = ltrim($service, '\\');*/
 				$def->autowired = FALSE;
 				return $def->class = $service;
 			}

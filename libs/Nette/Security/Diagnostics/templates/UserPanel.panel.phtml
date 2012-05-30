@@ -6,16 +6,7 @@ use Nette,
 	Nette\Diagnostics\Helpers;
 
 ?>
-<style>
-
-	#nette-debug .nette-UserPanel pre {
-		background: #FDF5CE;
-		padding: .4em .7em;
-		border: 1px dotted silver;
-		overflow: auto;
-	}
-
-</style>
+<style>#nette-debug .nette-UserPanel pre{background:#FDF5CE;padding:.4em .7em;border:1px dotted silver;overflow:auto}</style>
 
 <div class="nette-UserPanel">
 	<h1><?php if ($this->user->isLoggedIn()): ?>Logged in<?php else: ?>Unlogged<?php endif ?></h1>

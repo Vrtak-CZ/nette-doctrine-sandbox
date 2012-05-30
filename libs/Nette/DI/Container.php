@@ -88,7 +88,7 @@ class Container extends Nette\FreezableObject implements IContainer
 			$this->meta[$name] = $meta;
 			return $this;
 
-		} elseif (!is_string($service) || strpos($service, ':') !== FALSE/*5.2* || $service[0] === "\0"*/) { // callable
+		} elseif (!is_string($service) || strpos($service, ':') !== FALSE) { // callable
 			$service = callback($service);
 		}
 
@@ -145,7 +145,7 @@ class Container extends Nette\FreezableObject implements IContainer
 			} else {
 				$this->creating[$name] = TRUE;
 				try {
-					$service = $factory/*5.2*->invoke*/($this);
+					$service = $factory($this);
 				} catch (\Exception $e) {}
 			}
 

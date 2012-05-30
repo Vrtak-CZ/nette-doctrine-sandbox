@@ -531,7 +531,7 @@ abstract class BaseControl extends Nette\ComponentModel\Component implements ICo
 	/**
 	 * @return array
 	 */
-	private static function exportRules($rules)
+	protected static function exportRules($rules)
 	{
 		$payload = array();
 		foreach ($rules as $rule) {
@@ -615,19 +615,6 @@ abstract class BaseControl extends Nette\ComponentModel\Component implements ICo
 	public static function validateValid(IControl $control)
 	{
 		return $control->rules->validate(TRUE);
-	}
-
-
-
-	/**
-	 * Rangle validator: is a control's value number in specified range?
-	 * @param  Nette\Forms\IControl
-	 * @param  array  min and max value pair
-	 * @return bool
-	 */
-	public static function validateRange(IControl $control, $range)
-	{
-		return Nette\Utils\Validators::isInRange($control->getValue(), $range);
 	}
 
 

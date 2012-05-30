@@ -112,21 +112,6 @@ class ClassType extends \ReflectionClass
 	 */
 	public function getExtensionMethod($name)
 	{
-		/*5.2* if (self::$extMethods === NULL || $name === NULL) { // for backwards compatibility
-			$list = get_defined_functions(); // names are lowercase!
-			foreach ($list['user'] as $fce) {
-				$pair = explode('_prototype_', $fce);
-				if (count($pair) === 2) {
-					self::$extMethods[$pair[1]][$pair[0]] = callback($fce);
-					self::$extMethods[$pair[1]][''] = NULL;
-				}
-			}
-			if ($name === NULL) {
-				return NULL;
-			}
-		}
-		*/
-
 		$class = strtolower($this->getName());
 		$l = & self::$extMethods[strtolower($name)];
 
@@ -310,9 +295,9 @@ class ClassType extends \ReflectionClass
 	/**
 	 * @return ClassType
 	 */
-	public /**/static/**/ function getReflection()
+	public static function getReflection()
 	{
-		return new ClassType(/*5.2*$this*//**/get_called_class()/**/);
+		return new ClassType(get_called_class());
 	}
 
 

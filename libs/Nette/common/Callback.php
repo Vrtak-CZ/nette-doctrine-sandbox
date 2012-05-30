@@ -39,21 +39,6 @@ final class Callback extends Object
 		if ($m !== NULL) {
 			$cb = array($cb, $m); // back-compatibility
 		}
-		/*5.2*
-		if (PHP_VERSION_ID < 50202 && is_string($cb) && strpos($cb, '::')) {
-			$cb = explode('::', $cb, 2);
-		} elseif (is_object($cb) && !$cb instanceof Closure) {
-			$cb = array($cb, '__invoke');
-		}
-
-		// remove class namespace
-		if (is_string($this->cb) && $a = strrpos($this->cb, '\\')) {
-			$this->cb = substr($this->cb, $a + 1);
-
-		} elseif (is_array($this->cb) && is_string($this->cb[0]) && $a = strrpos($this->cb[0], '\\')) {
-			$this->cb[0] = substr($this->cb[0], $a + 1);
-		}
-		*/
 		if (!is_callable($cb, TRUE)) {
 			throw new InvalidArgumentException("Invalid callback.");
 		}
