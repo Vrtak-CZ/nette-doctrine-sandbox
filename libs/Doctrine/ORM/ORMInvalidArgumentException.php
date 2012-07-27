@@ -13,7 +13,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
@@ -61,9 +61,11 @@ class ORMInvalidArgumentException extends \InvalidArgumentException
                             . " configured to cascade persist operations for entity: " . self::objToStr($entry) . "."
                             . " To solve this issue: Either explicitly call EntityManager#persist()"
                             . " on this unknown entity or configure cascade persist "
-                            . " this association in the mapping for example @ManyToOne(..,cascade={\"persist\"}). "
-                            . " If you cannot find out which entity causes the problem"
-                            . " implement '" . $assoc['targetEntity'] . "#__toString()' to get a clue.");
+                            . " this association in the mapping for example @ManyToOne(..,cascade={\"persist\"})."
+                            . (method_exists($entry, '__toString') ?
+                                "":
+                                " If you cannot find out which entity causes the problem"
+                               ." implement '" . $assoc['targetEntity'] . "#__toString()' to get a clue."));
     }
 
     static public function detachedEntityFoundThroughRelationship(array $assoc, $entry)
@@ -92,6 +94,12 @@ class ORMInvalidArgumentException extends \InvalidArgumentException
     static public function detachedEntityCannot($entity, $operation)
     {
         throw new self("A detached entity was found during " . $operation . " " . self::objToStr($entity));
+    }
+
+    public static function invalidObject($context, $given, $parameterIndex = 1)
+    {
+        return new self($context .' expects parameter ' . $parameterIndex . 
+                    ' to be an entity object, '. gettype($given) . ' given.');
     }
 
     /**

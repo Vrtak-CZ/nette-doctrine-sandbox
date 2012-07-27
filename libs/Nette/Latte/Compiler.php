@@ -131,6 +131,9 @@ class Compiler extends Nette\Object
 
 				} elseif ($token->type === Token::HTML_ATTRIBUTE) {
 					$this->processHtmlAttribute($token);
+
+				} elseif ($token->type === Token::COMMENT) {
+					$this->processComment($token);
 				}
 			}
 		} catch (CompileException $e) {
@@ -236,7 +239,7 @@ class Compiler extends Nette\Object
 
 
 
-	private function processHtmlTagBegin($token)
+	private function processHtmlTagBegin(Token $token)
 	{
 		if ($token->closing) {
 			do {
@@ -244,7 +247,13 @@ class Compiler extends Nette\Object
 				if (!$htmlNode) {
 					$htmlNode = new HtmlNode($token->name);
 				}
-			} while (strcasecmp($htmlNode->name, $token->name));
+				if (strcasecmp($htmlNode->name, $token->name) === 0) {
+					break;
+				}
+				if ($htmlNode->macroAttrs) {
+					throw new CompileException("Unexpected </$token->name>.", 0, $token->line);
+				}
+			} while (TRUE);
 			$this->htmlNodes[] = $htmlNode;
 			$htmlNode->closing = TRUE;
 			$htmlNode->offset = strlen($this->output);
@@ -265,7 +274,7 @@ class Compiler extends Nette\Object
 
 
 
-	private function processHtmlTagEnd($token)
+	private function processHtmlTagEnd(Token $token)
 	{
 		if ($token->text === '-->') {
 			$this->output .= $token->text;
@@ -308,7 +317,7 @@ class Compiler extends Nette\Object
 
 
 
-	private function processHtmlAttribute($token)
+	private function processHtmlAttribute(Token $token)
 	{
 		$htmlNode = end($this->htmlNodes);
 		if (Strings::startsWith($token->name, Parser::N_PREFIX)) {
@@ -325,6 +334,16 @@ class Compiler extends Nette\Object
 				}
 				$this->setContext($token->value, $context);
 			}
+		}
+	}
+
+
+
+	private function processComment(Token $token)
+	{
+		$isLeftmost = trim(substr($this->output, strrpos("\n$this->output", "\n"))) === '';
+		if (!$isLeftmost) {
+			$this->output .= substr($token->text, strlen(rtrim($token->text, "\n")));
 		}
 	}
 

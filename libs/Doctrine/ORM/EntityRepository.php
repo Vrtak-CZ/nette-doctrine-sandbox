@@ -13,7 +13,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
@@ -21,6 +21,11 @@ namespace Doctrine\ORM;
 
 use Doctrine\DBAL\LockMode;
 use Doctrine\Common\Persistence\ObjectRepository;
+
+use Doctrine\Common\Collections\Selectable;
+use Doctrine\Common\Collections\Criteria;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\ExpressionBuilder;
 
 /**
  * An EntityRepository serves as a repository for entities with generic as well as
@@ -35,8 +40,13 @@ use Doctrine\Common\Persistence\ObjectRepository;
  * @author  Jonathan Wage <jonwage@gmail.com>
  * @author  Roman Borschel <roman@code-factory.org>
  */
-class EntityRepository implements ObjectRepository
+class EntityRepository implements ObjectRepository, Selectable
 {
+    /**
+     * @var Doctrine\Common\Collections\ExpressionBuilder
+     */
+    private static $expressionBuilder;
+
     /**
      * @var string
      */
@@ -61,8 +71,8 @@ class EntityRepository implements ObjectRepository
     public function __construct($em, Mapping\ClassMetadata $class)
     {
         $this->_entityName = $class->name;
-        $this->_em = $em;
-        $this->_class = $class;
+        $this->_em         = $em;
+        $this->_class      = $class;
     }
 
     /**
@@ -90,6 +100,21 @@ class EntityRepository implements ObjectRepository
     }
 
     /**
+     * Creates a native SQL query.
+     *
+     * @param string $queryName
+     * @return NativeQuery
+     */
+    public function createNativeNamedQuery($queryName)
+    {
+        $queryMapping   = $this->_class->getNamedNativeQuery($queryName);
+        $rsm            = new Query\ResultSetMappingBuilder($this->_em);
+        $rsm->addNamedNativeQueryMapping($this->_class, $queryMapping);
+
+        return $this->_em->createNativeQuery($queryMapping['query'], $rsm);
+    }
+
+    /**
      * Clears the repository, causing all managed entities to become detached.
      */
     public function clear()
@@ -110,37 +135,49 @@ class EntityRepository implements ObjectRepository
         if ( ! is_array($id)) {
             $id = array($this->_class->identifier[0] => $id);
         }
+
         $sortedId = array();
+
         foreach ($this->_class->identifier as $identifier) {
-            if (!isset($id[$identifier])) {
+            if ( ! isset($id[$identifier])) {
                 throw ORMException::missingIdentifierField($this->_class->name, $identifier);
             }
+
             $sortedId[$identifier] = $id[$identifier];
         }
 
         // Check identity map first
-        if ($entity = $this->_em->getUnitOfWork()->tryGetById($sortedId, $this->_class->rootEntityName)) {
+        if (($entity = $this->_em->getUnitOfWork()->tryGetById($sortedId, $this->_class->rootEntityName)) !== false) {
             if ( ! ($entity instanceof $this->_class->name)) {
                 return null;
             }
 
-            if ($lockMode !== LockMode::NONE) {
-                $this->_em->lock($entity, $lockMode, $lockVersion);
+            switch ($lockMode) {
+                case LockMode::OPTIMISTIC:
+                    $this->_em->lock($entity, $lockMode, $lockVersion);
+                    break;
+                case LockMode::PESSIMISTIC_READ:
+                case LockMode::PESSIMISTIC_WRITE:
+                    $persister = $this->_em->getUnitOfWork()->getEntityPersister($this->_entityName);
+                    $persister->refresh($sortedId, $entity, $lockMode);
+                    break;
             }
 
             return $entity; // Hit!
         }
 
+        $persister = $this->_em->getUnitOfWork()->getEntityPersister($this->_entityName);
+
         switch ($lockMode) {
             case LockMode::NONE:
-                return $this->_em->getUnitOfWork()->getEntityPersister($this->_entityName)->load($sortedId);
+                return $persister->load($sortedId);
 
             case LockMode::OPTIMISTIC:
                 if ( ! $this->_class->isVersioned) {
                     throw OptimisticLockException::notVersioned($this->_entityName);
                 }
 
-                $entity = $this->_em->getUnitOfWork()->getEntityPersister($this->_entityName)->load($sortedId);
+                $entity = $persister->load($sortedId);
 
                 $this->_em->getUnitOfWork()->lock($entity, $lockMode, $lockVersion);
 
@@ -151,7 +188,7 @@ class EntityRepository implements ObjectRepository
                     throw TransactionRequiredException::transactionRequired();
                 }
 
-                return $this->_em->getUnitOfWork()->getEntityPersister($this->_entityName)->load($sortedId, null, null, array(), $lockMode);
+                return $persister->load($sortedId, null, null, array(), $lockMode);
         }
     }
 
@@ -176,7 +213,9 @@ class EntityRepository implements ObjectRepository
      */
     public function findBy(array $criteria, array $orderBy = null, $limit = null, $offset = null)
     {
-        return $this->_em->getUnitOfWork()->getEntityPersister($this->_entityName)->loadAll($criteria, $orderBy, $limit, $offset);
+        $persister = $this->_em->getUnitOfWork()->getEntityPersister($this->_entityName);
+
+        return $persister->loadAll($criteria, $orderBy, $limit, $offset);
     }
 
     /**
@@ -187,7 +226,9 @@ class EntityRepository implements ObjectRepository
      */
     public function findOneBy(array $criteria)
     {
-        return $this->_em->getUnitOfWork()->getEntityPersister($this->_entityName)->load($criteria, null, null, array(), 0, 1);
+        $persister = $this->_em->getUnitOfWork()->getEntityPersister($this->_entityName);
+
+        return $persister->load($criteria, null, null, array(), 0, 1);
     }
 
     /**
@@ -201,13 +242,13 @@ class EntityRepository implements ObjectRepository
     public function __call($method, $arguments)
     {
         switch (true) {
-            case (substr($method, 0, 6) == 'findBy'):
-                $by = substr($method, 6, strlen($method));
+            case (0 === strpos($method, 'findBy')):
+                $by = substr($method, 6);
                 $method = 'findBy';
                 break;
 
-            case (substr($method, 0, 9) == 'findOneBy'):
-                $by = substr($method, 9, strlen($method));
+            case (0 === strpos($method, 'findOneBy')):
+                $by = substr($method, 9);
                 $method = 'findOneBy';
                 break;
 
@@ -225,7 +266,22 @@ class EntityRepository implements ObjectRepository
         $fieldName = lcfirst(\Doctrine\Common\Util\Inflector::classify($by));
 
         if ($this->_class->hasField($fieldName) || $this->_class->hasAssociation($fieldName)) {
-            return $this->$method(array($fieldName => $arguments[0]));
+            switch (count($arguments)) {
+                case 1:
+                    return $this->$method(array($fieldName => $arguments[0]));
+
+                case 2:
+                    return $this->$method(array($fieldName => $arguments[0]), $arguments[1]);
+
+                case 3:
+                    return $this->$method(array($fieldName => $arguments[0]), $arguments[1], $arguments[2]);
+
+                case 4;
+                    return $this->$method(array($fieldName => $arguments[0]), $arguments[1], $arguments[2], $arguments[3]);
+
+                default:
+                    // Do nothing
+            }
         }
 
         throw ORMException::invalidFindByCall($this->_entityName, $fieldName, $method.$by);
@@ -261,5 +317,33 @@ class EntityRepository implements ObjectRepository
     protected function getClassMetadata()
     {
         return $this->_class;
+    }
+
+    /**
+     * Select all elements from a selectable that match the expression and
+     * return a new collection containing these elements.
+     *
+     * @param \Doctrine\Common\Collections\Criteria $criteria
+     *
+     * @return \Doctrine\Common\Collections\Collection
+     */
+    public function matching(Criteria $criteria)
+    {
+        $persister = $this->_em->getUnitOfWork()->getEntityPersister($this->_entityName);
+
+        return new ArrayCollection($persister->loadCriteria($criteria));
+    }
+
+    /**
+     * Return Builder object that helps with building criteria expressions.
+     *
+     * @return \Doctrine\Common\Collections\ExpressionBuilder
+     */
+    public function expr()
+    {
+        if (self::$expressionBuilder === null) {
+            self::$expressionBuilder = new ExpressionBuilder();
+        }
+        return self::$expressionBuilder;
     }
 }

@@ -13,7 +13,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This software consists of voluntary contributions made by many individuals
- * and is licensed under the LGPL. For more information, see
+ * and is licensed under the MIT license. For more information, see
  * <http://www.doctrine-project.org>.
  */
 
@@ -283,7 +283,7 @@ class SqlitePlatform extends AbstractPlatform
      *                          );
      * @param array $options  An associative array of table options:
      *
-     * @return void
+     * @return string
      * @override
      */
     protected function _getCreateTableSQL($name, array $columns, array $options = array())
@@ -293,7 +293,6 @@ class SqlitePlatform extends AbstractPlatform
 
         if (isset($options['primary']) && ! empty($options['primary'])) {
             $keyColumns = array_unique(array_values($options['primary']));
-            $keyColumns = array_map(array($this, 'quoteIdentifier'), $keyColumns);
             $queryFields.= ', PRIMARY KEY('.implode(', ', $keyColumns).')';
         }
 
