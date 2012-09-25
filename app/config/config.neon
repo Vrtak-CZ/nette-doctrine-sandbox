@@ -21,26 +21,20 @@ common:
 		session.save_path: "%tempDir%/sessions"
 		# zlib.output_compression: yes
 
-
 	nette:
 		session:
 			autoStart: smart
 
 	doctrine:
-		entityManagers:
-			default:
-				connection: %database%
+		connection: %database%
 
-				console: true
+		console: true
 
 	migrations:
-		connection: @doctrine.connections.default
-
+		connection: @doctrine.connection
 
 	services:
-		console: @doctrine.console
-
-		database: @doctrine.entityManagers.default
+		database: @doctrine.entityManager
 
 		authenticator: Authenticator( @database::getRepository('User') )
 

@@ -7,7 +7,7 @@ use Nette\Application\Routers\Route;
 
 
 // Load Nette Framework
-require LIBS_DIR . '/Nette/loader.php';
+require LIBS_DIR . '/autoload.php';
 
 
 // Configure application
@@ -21,11 +21,11 @@ $configurator->enableDebugger(__DIR__ . '/../log');
 $configurator->setTempDirectory(__DIR__ . '/../temp');
 $configurator->createRobotLoader()
 	->addDirectory(APP_DIR)
-	->addDirectory(LIBS_DIR)
 	->register();
 
-\Nella\NetteAddons\Doctrine\Config\Extension::register($configurator);
-\Nella\NetteAddons\Doctrine\Config\MigrationsExtension::register($configurator);
+\Nella\Console\Config\Extension::register($configurator);
+\Nella\Doctrine\Config\Extension::register($configurator);
+\Nella\Doctrine\Config\MigrationsExtension::register($configurator);
 
 // Create Dependency Injection container from config.neon file
 $configurator->addConfig(__DIR__ . '/config/config.neon');
@@ -37,8 +37,4 @@ $container->router[] = new Route('<presenter>/<action>[/<id>]', 'Homepage:defaul
 
 
 // Configure and run the application!
-if (PHP_SAPI == 'cli') {
-	$container->console->run();
-} else {
-	$container->application->run();
-}
+$container->application->run();

@@ -1,0 +1,12 @@
+{
+	"name": "vrtak-cz/nette-doctrine-sandbox",
+	"description": "Sandbox for Nette & Doctrine",
+	"config": {
+		"vendor-dir": "./libs"
+	},
+	"require": {
+		"nella/doctrine": "@dev",
+		"nella/console": "@dev",
+		"doctrine/migrations": "@dev"
+	}
+}
