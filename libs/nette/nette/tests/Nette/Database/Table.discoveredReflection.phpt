@@ -6,12 +6,12 @@
  * @author     Jakub Vrana
  * @author     Jan Skrasek
  * @package    Nette\Database
- * @subpackage UnitTests
+ * @multiple   databases.ini
  */
 
 require __DIR__ . '/connect.inc.php'; // create $connection
 
-Nette\Database\Helpers::loadFromFile($connection, __DIR__ . '/nette_test1.sql');
+Nette\Database\Helpers::loadFromFile($connection, __DIR__ . "/{$driverName}-nette_test1.sql");
 $connection->setDatabaseReflection(new Nette\Database\Reflection\DiscoveredReflection);
 
 

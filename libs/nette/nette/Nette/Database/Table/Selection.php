@@ -12,6 +12,7 @@
 namespace Nette\Database\Table;
 
 use Nette,
+	Nette\Database\ISupplementalDriver,
 	PDO;
 
 
@@ -38,6 +39,9 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 
 	/** @var string primary key field name */
 	protected $primary;
+
+	/** @var string|bool primary column sequence name, FALSE for autodetection */
+	protected $primarySequence = FALSE;
 
 	/** @var ActiveRow[] data read from database in [primary key => ActiveRow] format */
 	protected $rows;
@@ -137,6 +141,42 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 	/**
 	 * @return string
 	 */
+	public function getPrimarySequence()
+	{
+		if ($this->primarySequence === FALSE) {
+			$this->primarySequence = NULL;
+
+			$driver = $this->connection->getSupplementalDriver();
+			if ($driver->isSupported(ISupplementalDriver::SUPPORT_SEQUENCE)) {
+				foreach ($driver->getColumns($this->name) as $column) {
+					if ($column['name'] === $this->primary) {
+						$this->primarySequence = $column['vendor']['sequence'];
+						break;
+					}
+				}
+			}
+		}
+
+		return $this->primarySequence;
+	}
+
+
+
+	/**
+	 * @param  string
+	 * @return Selection provides a fluent interface
+	 */
+	public function setPrimarySequence($sequence)
+	{
+		$this->primarySequence = $sequence;
+		return $this;
+	}
+
+
+
+	/**
+	 * @return string
+	 */
 	public function getSql()
 	{
 		return $this->sqlBuilder->buildSelectQuery();
@@ -145,7 +185,7 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 
 
 	/**
-	 * Loads cache of previous accessed columns and returns it
+	 * Loads cache of previous accessed columns and returns it.
 	 * @internal
 	 * @return array|false
 	 */
@@ -501,7 +541,7 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 
 
 	/**
-	 * Returns Selection parent for caching
+	 * Returns Selection parent for caching.
 	 * @return Selection
 	 */
 	protected function getRefTable(& $refPath)
@@ -569,7 +609,7 @@ class Selection extends Nette\Object implements \Iterator, \ArrayAccess, \Counta
 			return $return->rowCount();
 		}
 
-		if (!isset($data[$this->primary]) && ($id = $this->connection->lastInsertId())) {
+		if (!isset($data[$this->primary]) && ($id = $this->connection->lastInsertId($this->getPrimarySequence()))) {
 			$data[$this->primary] = $id;
 			return $this->rows[$id] = $this->createRow($data);
 

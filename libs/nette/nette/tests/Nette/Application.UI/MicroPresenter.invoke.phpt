@@ -5,7 +5,6 @@
  *
  * @author     Filip Procházka
  * @package    Nette\Application\UI
- * @subpackage UnitTests
  */
 
 use Nette\Application\Request;
@@ -31,7 +30,7 @@ $presenter = new NetteModule\MicroPresenter($container);
 
 
 $presenter->run(new Request('Nette:Micro', 'GET', array(
-	'callback' => function ($id, $page) {
+	'callback' => function($id, $page) {
 		TestHelpers::note('Callback id ' . $id . ' page ' . $page);
 	},
 	'id' => 1,

@@ -6,12 +6,12 @@
  * @author     Jakub Vrana
  * @author     Jan Skrasek
  * @package    Nette\Database
- * @subpackage UnitTests
+ * @multiple   databases.ini
  */
 
 require __DIR__ . '/connect.inc.php'; // create $connection
 
-Nette\Database\Helpers::loadFromFile($connection, __DIR__ . '/nette_test1.sql');
+Nette\Database\Helpers::loadFromFile($connection, __DIR__ . "/{$driverName}-nette_test1.sql");
 
 
 
@@ -20,6 +20,12 @@ $connection->table('author')->insert(array(
 	'name' => 'Eddard Stark',
 	'web' => 'http://example.com',
 ));  // INSERT INTO `author` (`id`, `name`, `web`) VALUES (13, 'Edard Stark', 'http://example.com')
+
+switch ($driverName) {
+	case 'pgsql':
+	$connection->exec("SELECT setval('author_id_seq'::regclass, 13, TRUE)");
+	break;
+}
 
 
 
