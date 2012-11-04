@@ -53,7 +53,7 @@
                 "email": "kontakt@beberlei.de"
             },
             {
-                "name": "Johannes M. Schmitt",
+                "name": "Johannes Schmitt",
                 "email": "schmittjoh@gmail.com",
                 "homepage": "http://jmsyst.com",
                 "role": "Developer of wrapped JMSSerializerBundle"
@@ -71,24 +71,24 @@
     },
     {
         "name": "symfony/console",
-        "version": "v2.1.2",
-        "version_normalized": "2.1.2.0",
+        "version": "v2.1.3",
+        "version_normalized": "2.1.3.0",
         "target-dir": "Symfony/Component/Console",
         "source": {
             "type": "git",
             "url": "https://github.com/symfony/Console",
-            "reference": "v2.1.0-RC2"
+            "reference": "v2.1.3"
         },
         "dist": {
             "type": "zip",
-            "url": "https://github.com/symfony/Console/zipball/v2.1.0-RC2",
-            "reference": "v2.1.0-RC2",
+            "url": "https://github.com/symfony/Console/zipball/v2.1.3",
+            "reference": "v2.1.3",
             "shasum": ""
         },
         "require": {
             "php": ">=5.3.3"
         },
-        "time": "2012-08-22 06:48:41",
+        "time": "2012-10-22 07:37:12",
         "type": "library",
         "extra": {
             "branch-alias": {
@@ -326,12 +326,12 @@
         "source": {
             "type": "git",
             "url": "https://github.com/nella/doctrine",
-            "reference": "cea0c254860460617c6719f4b3892a9858208399"
+            "reference": "008135e329841a0b069a9a436ca5a0f7227336c5"
         },
         "dist": {
             "type": "zip",
-            "url": "https://github.com/nella/doctrine/zipball/cea0c254860460617c6719f4b3892a9858208399",
-            "reference": "cea0c254860460617c6719f4b3892a9858208399",
+            "url": "https://github.com/nella/doctrine/archive/008135e329841a0b069a9a436ca5a0f7227336c5.zip",
+            "reference": "008135e329841a0b069a9a436ca5a0f7227336c5",
             "shasum": ""
         },
         "require": {
@@ -344,7 +344,7 @@
             "doctrine/migrations": "Need for migrations support",
             "nella/gedmo": "Integrate Doctrine Gedmo extension to Nette Framework"
         },
-        "time": "2012-09-19 23:45:12",
+        "time": "2012-10-26 12:13:24",
         "type": "nette-addon",
         "installation-source": "source",
         "autoload": {
@@ -387,12 +387,12 @@
         "source": {
             "type": "git",
             "url": "https://github.com/nella/console",
-            "reference": "b060fa93c2042c092dba1a9edcbeaffa2fd020bd"
+            "reference": "381b685f31ac56d04c927090e8e7576f238a5f77"
         },
         "dist": {
             "type": "zip",
-            "url": "https://github.com/nella/console/zipball/b060fa93c2042c092dba1a9edcbeaffa2fd020bd",
-            "reference": "b060fa93c2042c092dba1a9edcbeaffa2fd020bd",
+            "url": "https://github.com/nella/console/archive/381b685f31ac56d04c927090e8e7576f238a5f77.zip",
+            "reference": "381b685f31ac56d04c927090e8e7576f238a5f77",
             "shasum": ""
         },
         "require": {
@@ -400,7 +400,7 @@
             "nette/nette": "2.0.*",
             "symfony/console": "2.*"
         },
-        "time": "2012-09-12 18:34:44",
+        "time": "2012-09-22 21:42:39",
         "type": "nette-addon",
         "installation-source": "source",
         "autoload": {
@@ -445,7 +445,7 @@
         },
         "dist": {
             "type": "zip",
-            "url": "https://github.com/doctrine/migrations/zipball/c1d875ce7d092dd1bc7508c3867b5c6b97431e43",
+            "url": "https://github.com/doctrine/migrations/archive/c1d875ce7d092dd1bc7508c3867b5c6b97431e43.zip",
             "reference": "c1d875ce7d092dd1bc7508c3867b5c6b97431e43",
             "shasum": ""
         },
