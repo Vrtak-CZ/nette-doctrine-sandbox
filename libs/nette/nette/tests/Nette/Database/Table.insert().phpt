@@ -6,7 +6,7 @@
  * @author     Jakub Vrana
  * @author     Jan Skrasek
  * @package    Nette\Database
- * @multiple   databases.ini
+ * @dataProvider? databases.ini
  */
 
 require __DIR__ . '/connect.inc.php'; // create $connection
@@ -32,7 +32,7 @@ switch ($driverName) {
 $insert = array(
 	'name' => 'Catelyn Stark',
 	'web' => 'http://example.com',
-	'born' => new DateTime('2011-11-11'),
+	'born' => new Nette\DateTime('2011-11-11'),
 );
 $connection->table('author')->insert($insert);  // INSERT INTO `author` (`name`, `web`, `born`) VALUES ('Catelyn Stark', 'http://example.com', '2011-11-11 00:00:00')
 
@@ -43,7 +43,7 @@ Assert::equal(array(
 	'id' => 14,
 	'name' => 'Catelyn Stark',
 	'web' => 'http://example.com',
-	'born' => new DateTime('2011-11-11'),
+	'born' => new Nette\DateTime('2011-11-11'),
 ), $catelynStark->toArray());
 
 
@@ -69,7 +69,7 @@ Assert::same('Eddard Stark', $book3->author->name);  // SELECT * FROM `author` W
 
 
 
-Assert::throws(function() use ($connection) {
+Assert::exception(function() use ($connection) {
 	$connection->table('author')->insert(array(
 		'id' => 14,
 		'name' => 'Jon Snow',

@@ -6,7 +6,7 @@
  * @author     Jakub Vrana
  * @author     Jan Skrasek
  * @package    Nette\Database
- * @multiple   databases.ini
+ * @dataProvider? databases.ini
  */
 
 require __DIR__ . '/connect.inc.php'; // create $connection
@@ -22,7 +22,6 @@ Assert::same(array(
 	2 => 'JUSH',
 	3 => 'Nette',
 ), $apps);
-
 
 
 

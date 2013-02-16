@@ -11,20 +11,18 @@
 require __DIR__ . '/../bootstrap.php';
 
 
-$config = parse_ini_file(__DIR__ . '/databases.ini', TRUE);
-$current = isset($_SERVER['argv'][1]) ? $config[$_SERVER['argv'][1]] : reset($config);
-
-
-try {
-	$rc = new ReflectionClass('Nette\Database\Connection');
-	/** @var Nette\Database\Connection */
-	$connection = $rc->newInstanceArgs($current);
-
-} catch (PDOException $e) {
-	TestHelpers::skip("Connection to '$current[dsn]' failed. Reason: " . $e->getMessage());
+if (!is_file(__DIR__ . '/databases.ini')) {
+	Tester\Helpers::skip();
 }
 
-TestHelpers::lock($current['dsn'], dirname(TEMP_DIR));
+$options = Tester\DataProvider::load('databases.ini', isset($query) ? $query : NULL);
+$options = isset($_SERVER['argv'][1]) ? $options[$_SERVER['argv'][1]] : reset($options);
 
-unset($config, $current, $rc);
+try {
+	$connection = new Nette\Database\Connection($options['dsn'], $options['user'], $options['password']);
+} catch (PDOException $e) {
+	Tester\Helpers::skip("Connection to '$options[dsn]' failed. Reason: " . $e->getMessage());
+}
+
+Tester\Helpers::lock($options['dsn'], dirname(TEMP_DIR));
 $driverName = $connection->getAttribute(PDO::ATTR_DRIVER_NAME);

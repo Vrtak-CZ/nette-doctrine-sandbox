@@ -243,7 +243,8 @@ final class Debugger
 		if (is_string($logDirectory)) {
 			self::$logDirectory = realpath($logDirectory);
 			if (self::$logDirectory === FALSE) {
-				die(__METHOD__ . "() error: Log directory is not found or is not directory.");
+				echo __METHOD__ . "() error: Log directory is not found or is not directory.\n";
+				exit(254);
 			}
 		} elseif ($logDirectory === FALSE) {
 			self::$logDirectory = FALSE;
@@ -262,12 +263,14 @@ final class Debugger
 			ini_set('log_errors', FALSE);
 
 		} elseif (ini_get('display_errors') != !self::$productionMode && ini_get('display_errors') !== (self::$productionMode ? 'stderr' : 'stdout')) { // intentionally ==
-			die(__METHOD__ . "() error: Unable to set 'display_errors' because function ini_set() is disabled.");
+			echo __METHOD__ . "() error: Unable to set 'display_errors' because function ini_set() is disabled.\n";
+			exit(254);
 		}
 
 		if ($email) {
 			if (!is_string($email)) {
-				die(__METHOD__ . '() error: Email address must be a string.');
+				echo __METHOD__ . "() error: Email address must be a string.\n";
+				exit(254);
 			}
 			self::$email = $email;
 		}
@@ -432,8 +435,8 @@ final class Debugger
 						self::$bar->render();
 					}
 
-				} elseif (!self::fireLog($exception, self::ERROR)) { // AJAX or non-HTML mode
-					$file = self::log($exception);
+				} elseif (!self::fireLog($exception)) { // AJAX or non-HTML mode
+					$file = self::log($exception, self::ERROR);
 					if (!headers_sent()) {
 						header("X-Nette-Error-Log: $file");
 					}
@@ -454,7 +457,7 @@ final class Debugger
 		}
 
 		self::$enabled = FALSE; // un-register shutdown function
-		exit(255);
+		exit(254);
 	}
 
 
@@ -517,7 +520,7 @@ final class Debugger
 			return NULL;
 
 		} else {
-			$ok = self::fireLog(new \ErrorException($message, 0, $severity, $file, $line), self::WARNING);
+			$ok = self::fireLog(new \ErrorException($message, 0, $severity, $file, $line));
 			return !self::isHtmlMode() || (!self::$bar && !$ok) ? FALSE : NULL;
 		}
 

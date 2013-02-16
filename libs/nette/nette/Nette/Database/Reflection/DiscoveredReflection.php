@@ -35,6 +35,9 @@ class DiscoveredReflection extends Nette\Object implements Nette\Database\IRefle
 	/** @var array */
 	protected $structure = array();
 
+	/** @var array */
+	protected $loadedStructure;
+
 
 
 	/**
@@ -52,7 +55,7 @@ class DiscoveredReflection extends Nette\Object implements Nette\Database\IRefle
 		$this->connection = $connection;
 		if ($this->cacheStorage) {
 			$this->cache = new Nette\Caching\Cache($this->cacheStorage, 'Nette.Database.' . md5($connection->getDsn()));
-			$this->structure = $this->cache->load('structure') ?: $this->structure;
+			$this->structure = $this->loadedStructure = $this->cache->load('structure') ?: $this->structure;
 		}
 	}
 
@@ -60,7 +63,7 @@ class DiscoveredReflection extends Nette\Object implements Nette\Database\IRefle
 
 	public function __destruct()
 	{
-		if ($this->cache) {
+		if ($this->cache && $this->structure !== $this->loadedStructure) {
 			$this->cache->save('structure', $this->structure);
 		}
 	}
@@ -75,17 +78,17 @@ class DiscoveredReflection extends Nette\Object implements Nette\Database\IRefle
 		}
 
 		$columns = $this->connection->getSupplementalDriver()->getColumns($table);
-		$primaryCount = 0;
+		$primary = array();
 		foreach ($columns as $column) {
 			if ($column['primary']) {
-				$primary = $column['name'];
-				$primaryCount++;
+				$primary[] = $column['name'];
 			}
 		}
 
-		if ($primaryCount !== 1) {
-			$primary = '';
+		if (count($primary) === 0) {
 			return NULL;
+		} elseif (count($primary) === 1) {
+			$primary = reset($primary);
 		}
 
 		return $primary;

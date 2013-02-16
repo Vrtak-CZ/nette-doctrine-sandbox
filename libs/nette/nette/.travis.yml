@@ -1,6 +1,6 @@
 language: php
 php:
-    - 5.3
+    - 5.3.3
     - 5.4
 
 script: "./tests/run-tests.sh -s tests/"
@@ -16,11 +16,13 @@ before_script:
   - sh -c "cd memcached-1.4.14 && ./configure && make && ./memcached -d" > /dev/null
 
 # Install Nette Tester
-  - curl -s http://getcomposer.org/installer | php
-  - php composer.phar install --dev
+  - composer install --no-interaction --dev
 
 # PHP Memcache extension
   - echo n | pecl install memcache > /dev/null
 
+# Create databases.ini
+  - cp ./tests/Nette/Database/databases.sample.ini ./tests/Nette/Database/databases.ini
+
 # Create Postgre database
-  - psql -c 'create database nette_test;' -U postgres
+  - psql -c 'CREATE DATABASE nette_test' -U postgres

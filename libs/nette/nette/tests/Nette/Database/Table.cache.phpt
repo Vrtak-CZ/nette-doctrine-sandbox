@@ -6,7 +6,7 @@
  * @author     Jakub Vrana
  * @author     Jan Skrasek
  * @package    Nette\Database
- * @multiple   databases.ini
+ * @dataProvider? databases.ini
  */
 
 require __DIR__ . '/connect.inc.php'; // create $connection
@@ -105,6 +105,31 @@ $connection->setCacheStorage($cacheStorage);
 
 
 
+$selection = $connection->table('book');
+foreach ($selection as $book) {
+	$book->id;
+}
+$selection->__destruct();
+
+$authors = array();
+foreach ($connection->table('book') as $book) {
+	$authors[$book->author->name] = 1;
+}
+
+$authors = array_keys($authors);
+sort($authors);
+
+Assert::same(array(
+	'David Grudl',
+	'Jakub Vrana',
+), $authors);
+
+
+
+$cacheStorage->clean(array(Nette\Caching\Cache::ALL => TRUE));
+
+
+
 $relatedStack = array();
 foreach ($connection->table('author') as $author) {
 	$relatedStack[] = $related = $author->related('book.author_id');
@@ -114,8 +139,8 @@ foreach ($connection->table('author') as $author) {
 }
 
 foreach ($relatedStack as $related) {
-	$property = $related->reflection->getProperty('accessed');
+	$property = $related->reflection->getProperty('accessedColumns');
 	$property->setAccessible(true);
 	// checks if instances have shared data of accessed columns
-	Assert::same(array('id', 'author_id'), array_keys($property->getValue($related)));
+	Assert::same(array('id', 'author_id'), array_keys((array) $property->getValue($related)));
 }

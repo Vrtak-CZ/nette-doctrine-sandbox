@@ -6,7 +6,7 @@
  * @author     Jakub Vrana
  * @author     Jan Skrasek
  * @package    Nette\Database
- * @multiple   databases.ini
+ * @dataProvider? databases.ini
  */
 
 require __DIR__ . '/connect.inc.php'; // create $connection
@@ -16,7 +16,7 @@ Nette\Database\Helpers::loadFromFile($connection, __DIR__ . "/{$driverName}-nett
 
 
 $authorTagsCount = array();
-foreach ($connection->table('author')->select('author.*, COUNT(DISTINCT book:book_tag:tag_id) AS tagsCount')->group('author.id')->order('tagsCount DESC') as $author) {
+foreach ($connection->table('author')->select('author.name, COUNT(DISTINCT book:book_tag:tag_id) AS tagsCount')->group('author.name')->order('tagsCount DESC') as $author) {
 	$authorTagsCount[$author->name] = $author->tagsCount;
 }
 

@@ -15,7 +15,7 @@ require __DIR__ . '/../bootstrap.php';
 
 
 
-$obj = (object) NULL;
+$obj = new stdClass;
 $arr1 = array('a' => 'b', 'x');
 $arr2 = array('c' => 'd', 'y');
 
@@ -37,11 +37,11 @@ Assert::same( array('item' => array()), merge('item!:', 'item: 123') );
 
 Assert::same( array('item' => array()), merge('item!: []', 'item: []') );
 
-Assert::throws(function() {
+Assert::exception(function() {
 	merge('item!: 231', 'item:');
 }, 'Nette\InvalidStateException');
 
-Assert::throws(function() {
+Assert::exception(function() {
 	merge('item!: 231', 'item: 231');
 }, 'Nette\InvalidStateException');
 

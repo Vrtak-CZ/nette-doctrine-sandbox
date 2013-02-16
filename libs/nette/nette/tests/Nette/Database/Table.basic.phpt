@@ -6,7 +6,7 @@
  * @author     Jakub Vrana
  * @author     Jan Skrasek
  * @package    Nette\Database
- * @multiple   databases.ini
+ * @dataProvider? databases.ini
  */
 
 require __DIR__ . '/connect.inc.php'; // create $connection
@@ -28,7 +28,7 @@ Assert::same(array(
 ), $book);
 
 $book = $connection->table('book')->get(1);
-Assert::throws(function() use ($book) {
+Assert::exception(function() use ($book) {
 	$book->unknown_column;
 }, 'Nette\MemberAccessException', 'Cannot read an undeclared column "unknown_column".');
 

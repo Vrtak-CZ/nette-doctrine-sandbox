@@ -5,7 +5,7 @@
  *
  * @author     David Grudl
  * @package    Nette\Database
- * @multiple   databases.ini
+ * @dataProvider? databases.ini
  */
 
 require __DIR__ . '/connect.inc.php'; // create $connection
@@ -84,12 +84,14 @@ $expectedColumns = array(
 switch ($driverName) {
 	case 'pgsql':
 		$expectedColumns[0]['nativetype'] = 'INT4';
-		$expectedColumns[0]['size'] = 32;
 		$expectedColumns[0]['default'] = "nextval('author_id_seq'::regclass)";
+		$expectedColumns[0]['size'] = NULL;
+		$expectedColumns[1]['size'] = NULL;
+		$expectedColumns[2]['size'] = NULL;
 		break;
 }
 
-Assert::same($expectedColumns , $columns);
+Assert::same($expectedColumns, $columns);
 
 
 
@@ -139,6 +141,5 @@ Assert::same($expectedIndexes, $indexes);
 $reflection = new Nette\Database\Reflection\DiscoveredReflection;
 $reflection->setConnection($connection);
 
-// test caching primary key in table with multiple primary keys
-Assert::same(NULL, $reflection->getPrimary('book_tag'));
-Assert::same(NULL, $reflection->getPrimary('book_tag'));
+$primary = $reflection->getPrimary('book_tag');
+Assert::same(array('book_id', 'tag_id'), $primary);
